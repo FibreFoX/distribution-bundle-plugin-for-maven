@@ -180,6 +180,30 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- integration-testing via own projects -->
+            <plugin>
+                <artifactId>maven-invoker-plugin</artifactId>
+                <version>3.0.1</version>
+                <configuration>
+                    <projectsDirectory>src/it</projectsDirectory>
+                    <localRepositoryPath>target/local-repo</localRepositoryPath>
+                    <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
+                    <settingsFile>src/it/settings.xml</settingsFile>
+                    <showErrors>true</showErrors>
+                    <streamLogs>true</streamLogs>
+                    <skipInvocation>${skipTests}</skipInvocation>
+                    <postBuildHookScript>verify.bsh</postBuildHookScript>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>integration-test</id>
+                        <goals>
+                            <goal>install</goal>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
