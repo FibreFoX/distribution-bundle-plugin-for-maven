@@ -1,3 +1,5 @@
+[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/2f2tcy40htaws9p0/branch/master?svg=true)](https://ci.appveyor.com/project/FibreFoX/distribution-bundle-plugin-for-maven/branch/master)
+
 # Easy creationg of shareable software bundles for your Java application
 
 Distributing Java software applications gets tricky sometimes, therefor this plugin integrates the creation of them into your build system (maven).
