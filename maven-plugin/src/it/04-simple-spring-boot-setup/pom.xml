@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.0.0.RELEASE</version>
+    </parent>
+
+    <groupId>de.dynamicfiles.projects.maven.distributionbundleplugin.examples</groupId>
+    <artifactId>simple-spring-boot-setup</artifactId>
+    <version>1.0</version>
+    <packaging>jar</packaging>
+
+    <developers>
+        <developer>
+            <name>Danny Althoff</name>
+            <email>fibrefox@dynamicfiles.de</email>
+            <url>https://www.dynamicfiles.de</url>
+        </developer>
+    </developers>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.7.0</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <showDeprecation>true</showDeprecation>
+                    <compilerArgs>
+                        <arg>-Xlint:unchecked</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <!-- adding thus maven-plugin should do the spring-magic -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <plugin>
+                <groupId>de.dynamicfiles.projects.maven</groupId>
+                <artifactId>distribution-bundle-plugin</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>generate-java-bundle</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>java-app</goal>
+                        </goals>
+                        <configuration>
+                            <!-- when having spring boot, you don't want to copy all dependencies, as they are embedded -->
+                            <!-- REMEMBER: running "java-app" with spring-boot only required for the other (upcoming) native goals -->
+                            <copyDependencies>false</copyDependencies>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
