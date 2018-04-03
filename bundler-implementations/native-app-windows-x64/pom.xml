@@ -20,7 +20,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>de.dynamicfiles.projects.maven.distributionbundleplugin.bundler</groupId>
-    <artifactId>windows-nativeApp-x64</artifactId>
+    <artifactId>native-app-windows-x64</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
     <packaging>jar</packaging>

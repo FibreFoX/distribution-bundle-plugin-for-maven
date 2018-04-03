@@ -79,7 +79,7 @@
     </properties>
 
     <modules>
-        <module>windows-nativeApp-x64</module>
+        <module>native-app-windows-x64</module>
     </modules>
 
 </project>
