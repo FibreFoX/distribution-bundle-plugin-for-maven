@@ -25,10 +25,10 @@
 
     <packaging>pom</packaging>
 
-    <name>Distribution Bundle Maven Plugin - bundler implementations</name>
-    <url>https://www.dynamicfiles.de</url>
+    <name>Distribution Bundle Plugin for Maven - bundler implementations</name>
+    <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven</url>
     <description>
-        
+        Easy creationg of shareable software bundles for your Java application, integrated into your build-system: Maven.
     </description>
     <inceptionYear>2018</inceptionYear>
 
@@ -52,14 +52,14 @@
     </developers>
 
     <scm>
-        <connection></connection>
-        <developerConnection></developerConnection>
-        <url></url>
+        <connection>scm:git:git://github.com/FibreFoX/distribution-bundle-plugin-for-maven.git</connection>
+        <developerConnection>scm:git:git@github.com:FibreFoX/distribution-bundle-plugin-for-maven.git</developerConnection>
+        <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven.git</url>
     </scm>
 
     <issueManagement>
         <system>GitHub</system>
-        <url></url>
+        <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven/issues</url>
     </issueManagement>
 
     <distributionManagement>

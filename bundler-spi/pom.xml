@@ -28,7 +28,8 @@
     <name>Distribution Bundle Maven Plugin - bundler SPI project</name>
     <url>https://www.dynamicfiles.de</url>
     <description>
-        Each bundler used by the distribution-plugin requires to have some interface implemented. This projects provides that interface.
+        Easy creationg of shareable software bundles for your Java application, integrated into your build-system: Maven.
+        Each bundler used by the distribution-bundle-plugin require to have some interface implemented. This projects provides that SPI.
     </description>
     <inceptionYear>2018</inceptionYear>
 
@@ -51,6 +52,27 @@
         </developer>
     </developers>
 
+    <scm>
+        <connection>scm:git:git://github.com/FibreFoX/distribution-bundle-plugin-for-maven.git</connection>
+        <developerConnection>scm:git:git@github.com:FibreFoX/distribution-bundle-plugin-for-maven.git</developerConnection>
+        <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven.git</url>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven/issues</url>
+    </issueManagement>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

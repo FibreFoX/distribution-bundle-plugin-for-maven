@@ -26,9 +26,9 @@
     <packaging>maven-plugin</packaging>
 
     <name>Distribution Bundle Plugin for Maven</name>
-    <url>https://www.dynamicfiles.de</url>
+    <url>https://github.com/FibreFoX/distribution-bundle-plugin-for-maven</url>
     <description>
-        Easy creationg of shareable software bundles for your Java application
+        Easy creationg of shareable software bundles for your Java application, integrated into your build-system: Maven.
     </description>
     <inceptionYear>2018</inceptionYear>
 
