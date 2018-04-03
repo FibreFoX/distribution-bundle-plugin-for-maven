@@ -1,3 +1,4 @@
+[![Travis Build Status](https://travis-ci.org/FibreFoX/distribution-bundle-plugin-for-maven.svg?branch=master)](https://travis-ci.org/FibreFoX/distribution-bundle-plugin-for-maven)
 [![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/2f2tcy40htaws9p0/branch/master?svg=true)](https://ci.appveyor.com/project/FibreFoX/distribution-bundle-plugin-for-maven/branch/master)
 
 # WORK IN PROGRESS
