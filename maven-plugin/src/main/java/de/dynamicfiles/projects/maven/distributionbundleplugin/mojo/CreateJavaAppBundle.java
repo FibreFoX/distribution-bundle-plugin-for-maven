@@ -75,7 +75,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private File outputFolder;
 
     /**
-     * Set to true in case you want to clean the outputFolder on every execution.
+     * Set to true in case you want to clean the outputFolder on every execution. This might be useful in case you are running
+     * maven without the clean-goal, but want to assure a clean state for the generated java-app bundle.
      */
     @Parameter(defaultValue = "false")
     private boolean cleanupOutputFolder;
