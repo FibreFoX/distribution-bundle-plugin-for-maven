@@ -1,5 +1,6 @@
 package de.dynamicfiles.projects.maven.distributionbundleplugin;
 
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -26,8 +27,9 @@ import java.util.zip.ZipOutputStream;
  *
  * @author FibreFoX
  */
-public class InternalUtils {
+public class InternalUtils implements SharedInternalTools {
 
+    @Override
     public boolean copyRecursive(Path sourceFolder, Path targetFolder) throws IOException {
         AtomicBoolean failed = new AtomicBoolean(false);
         Files.walkFileTree(sourceFolder, new FileVisitor<Path>() {
@@ -65,6 +67,7 @@ public class InternalUtils {
         return failed.get();
     }
 
+    @Override
     public boolean deleteRecursive(Path sourceFolder) throws IOException {
         AtomicBoolean failed = new AtomicBoolean(false);
         Files.walkFileTree(sourceFolder, new FileVisitor<Path>() {
@@ -99,6 +102,7 @@ public class InternalUtils {
         return failed.get();
     }
 
+    @Override
     public void pack(final Path folder, final Path zipFilePath) throws IOException {
         // source of inspiration: http://stackoverflow.com/a/35158142/1961102
         try(FileOutputStream fos = new FileOutputStream(zipFilePath.toFile()); ZipOutputStream zos = new ZipOutputStream(fos)){
@@ -115,6 +119,7 @@ public class InternalUtils {
         }
     }
 
+    @Override
     public boolean isClassInsideJarFile(String classname, String locationPrefix, File jarFile) {
         String requestedJarEntryName = locationPrefix + classname.replace(".", "/") + ".class";
         try{
@@ -128,11 +133,27 @@ public class InternalUtils {
         return false;
     }
 
+    @Override
     public boolean isPlatformWindows() {
         return System.getProperty("os.name").toLowerCase().contains("win");
     }
 
+    @Override
+    public boolean isPlatformLinux() {
+        return System.getProperty("os.name").toLowerCase().contains("nix") || System.getProperty("os.name").toLowerCase().contains("nux");
+    }
+
+    @Override
+    public boolean isPlatformMac() {
+        return System.getProperty("os.name").toLowerCase().contains("mac");
+    }
+
+    @Override
     public boolean isLinuxExecutable64bit(Path linuxBinary) {
+        if( !(Files.isRegularFile(linuxBinary) || Files.isSymbolicLink(linuxBinary)) || !Files.isReadable(linuxBinary) ){
+            return false;
+        }
+
         try(FileChannel openFileChannel = FileChannel.open(linuxBinary, StandardOpenOption.READ)){
             MappedByteBuffer startMarker = openFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, 4);
             startMarker.load();
@@ -163,7 +184,12 @@ public class InternalUtils {
         return false;
     }
 
+    @Override
     public boolean isWindowsExecutable64bit(Path windowsBinary) {
+        if( !(Files.isRegularFile(windowsBinary) || Files.isSymbolicLink(windowsBinary)) || !Files.isReadable(windowsBinary) ){
+            return false;
+        }
+
         // try to find PE-header offset inside MS-DOS header and check architecture
         try(FileChannel openFileChannel = FileChannel.open(windowsBinary, StandardOpenOption.READ)){
             MappedByteBuffer startMarker = openFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, 2);

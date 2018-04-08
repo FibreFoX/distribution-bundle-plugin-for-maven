@@ -1,5 +1,6 @@
 package de.dynamicfiles.projects.maven.distributionbundleplugin.spi;
 
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import java.io.File;
 
 /**
@@ -25,7 +26,13 @@ public interface NativeInstallerBundle {
      */
     boolean checkRequirements(String jdkPath);
 
-    File bundleApp(String jdkPath);
+    /**
+     *
+     * @param jdkPath
+     *
+     * @return the location of the generated installer bundle
+     */
+    File bundleInstaller(String jdkPath);
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.
@@ -40,5 +47,14 @@ public interface NativeInstallerBundle {
      *
      * @return true, when this bundler is callable on provided OS, otherwise false
      */
-    boolean executableOnBuildsystem(OS os);
+    boolean creatableOnBuildsystem(OS os);
+
+    OS getClientOS();
+
+    /**
+     * When adding some installer as project-artifact, there has to be some file-extension being specified.
+     *
+     * @return file-extension without leading dot and isn't allowed to end with dot
+     */
+    String getInstallerFileExtension();
 }

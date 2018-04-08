@@ -1,5 +1,7 @@
 package de.dynamicfiles.projects.maven.distributionbundleplugin.spi;
 
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import java.io.File;
 
 /**
@@ -25,7 +27,7 @@ public interface NativeAppBundler {
      */
     boolean checkRequirements(String jdkPath);
 
-    File bundleApp(String jdkPath);
+    File bundleApp(String jdkPath, SharedInternalTools internalUtils);
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.
@@ -40,5 +42,7 @@ public interface NativeAppBundler {
      *
      * @return true, when this bundler is callable on provided OS, otherwise false
      */
-    boolean executableOnBuildsystem(OS os);
+    boolean creatableOnBuildsystem(OS os);
+
+    OS getClientOS();
 }
