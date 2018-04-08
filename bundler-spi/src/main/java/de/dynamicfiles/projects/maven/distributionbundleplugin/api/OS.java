@@ -1,4 +1,4 @@
-package de.dynamicfiles.projects.maven.distributionbundleplugin.spi;
+package de.dynamicfiles.projects.maven.distributionbundleplugin.api;
 
 /**
  *
