@@ -165,7 +165,6 @@ public class CreateNativeAppBundle extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        // TODO multi-platform (linux + windows are same, mac is special)
         // first check if there is something to process on
         if( !sourceFolder.exists() || sourceFolder.list().length == 0 ){
             throw new MojoExecutionException("No resources found to work on. Make sure to call 'distbundle:java-app' first.");
@@ -174,6 +173,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
         if( verbose ){
             getLog().info("Prepare target area: " + outputBaseFolder.toString());
         }
+
         if( outputBaseFolder.exists() && cleanupOutputFolder ){
             try{
                 if( verbose ){
@@ -205,6 +205,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
             if( verbose ){
                 getLog().info("Adding default native launcher entry...");
             }
+
             NativeLauncher defaultLauncher = new NativeLauncher();
             defaultLauncher.setFilename(project.getBuild().getFinalName());
             if( internalUtils.isPlatformWindows() ){
@@ -224,11 +225,13 @@ public class CreateNativeAppBundle extends AbstractMojo {
             if( configuredBundlerSource.trim().isEmpty() ){
                 return;
             }
+
             // check if it contains GAV
             if( configuredBundlerSource.split(":").length <= 2 ){
                 getLog().warn("Provided bundler source did not contain GAV format, using default bundler source artifact. Please check your plugin-configuration.");
                 return;
             }
+
             // developer did provide some GAV-reachable artifact
             bundlerSourceToUse.set(configuredBundlerSource.trim());
         });
@@ -238,12 +241,14 @@ public class CreateNativeAppBundle extends AbstractMojo {
             if( verbose ){
                 getLog().info("Using default bundler source artifact coordinates.");
             }
+
             // check targeted clientOS/-Arch for generating artifact-id
             AtomicReference<String> clientOSToUse = new AtomicReference<>();
             Optional.ofNullable(clientOS).ifPresent(configuredClientOS -> {
                 if( configuredClientOS.trim().isEmpty() ){
                     return;
                 }
+
                 // developer selected clientOS
                 clientOSToUse.set(configuredClientOS.trim());
             });
@@ -266,6 +271,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
                 if( configuredClientArch.trim().isEmpty() ){
                     return;
                 }
+
                 // developer selected clientArch
                 clientArchToUse.set(configuredClientArch.trim());
             });
@@ -299,6 +305,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
         if( bundlerSourceArtifact == null ){
             throw new MojoExecutionException("Provided bundlerSource did not contain the requested GAV-format. Please check your configuration.");
         }
+
         if( verbose ){
             getLog().info(String.format("Using GAV for bundler source artifact: %s", bundlerSourceToUse.get()));
         }
@@ -310,7 +317,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
         try{
             request.setLocalRepository(repositorySystem.createDefaultLocalRepository());
         } catch(InvalidRepositoryException ire){
-            // TODO handle
+            throw new MojoExecutionException("Got exception while creating local repository reference.", ire);
         }
         request.setRemoteRepositories(project.getRemoteArtifactRepositories());
 
@@ -318,12 +325,14 @@ public class CreateNativeAppBundle extends AbstractMojo {
             if( verbose ){
                 getLog().info("Activating OFFLINE search");
             }
+
             request.setOffline(true);
         }
 
         if( verbose ){
             getLog().info("Starting bundler source artifact resolution...");
         }
+
         ArtifactResolutionResult result = repositorySystem.resolve(request);
 
         if( !result.isSuccess() ){
@@ -349,6 +358,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
         if( verbose ){
             getLog().info("Creating temporary classloader for found bundler source artifact...");
         }
+
         // create our own classloader for easier isolation
         URLClassLoader cl = new URLClassLoader(
                 artifactUrls.toArray(new URL[0]),
@@ -368,6 +378,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
         if( verbose ){
             getLog().info("Searching for NativeAppBundler service implementations...");
         }
+
         ServiceLoader<NativeAppBundler> nativeAppBundlerServices = ServiceLoader.load(NativeAppBundler.class, cl);
 
         nativeAppBundlerServices.iterator().forEachRemaining(appBundler -> {
@@ -383,6 +394,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
                     if( verbose ){
                         getLog().info("Found bundler did not match requested id: " + appBundler.getBundlerIdentifier());
                     }
+
                     return;
                 }
             }
@@ -390,14 +402,18 @@ public class CreateNativeAppBundle extends AbstractMojo {
             if( verbose ){
                 getLog().info("Using bundler with id: " + appBundler.getBundlerIdentifier());
             }
+
             try{
                 if( verbose ){
                     getLog().info("Running bundler requirements checks...");
                 }
+
                 appBundler.checkRequirements(jdkPath);
+
                 if( verbose ){
                     getLog().info("Running creation of native app bundle...");
                 }
+
                 // here we have a "valid" bundler, so call it
                 File bundlerOutput = appBundler.bundleApp(jdkPath, internalUtils, outputBaseFolder, sourceFolder, tempWorkfolder, project, nativeLaunchers);
             } catch(MojoFailureException | MojoExecutionException ex){
