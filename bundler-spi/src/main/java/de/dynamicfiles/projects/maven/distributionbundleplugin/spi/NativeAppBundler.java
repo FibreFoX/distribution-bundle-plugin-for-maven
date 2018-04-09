@@ -15,9 +15,14 @@
  */
 package de.dynamicfiles.projects.maven.distributionbundleplugin.spi;
 
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLauncher;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import java.io.File;
+import java.util.List;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.project.MavenProject;
 
 /**
  *
@@ -42,7 +47,7 @@ public interface NativeAppBundler {
      */
     boolean checkRequirements(String jdkPath);
 
-    File bundleApp(String jdkPath, SharedInternalTools internalUtils);
+    File bundleApp(String jdkPath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException;
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.
