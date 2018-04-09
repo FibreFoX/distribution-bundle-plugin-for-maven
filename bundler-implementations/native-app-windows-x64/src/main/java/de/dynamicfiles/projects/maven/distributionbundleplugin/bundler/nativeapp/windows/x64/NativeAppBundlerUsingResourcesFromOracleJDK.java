@@ -1,0 +1,182 @@
+package de.dynamicfiles.projects.maven.distributionbundleplugin.bundler.nativeapp.windows.x64;
+
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLauncher;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.spi.NativeAppBundler;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.project.MavenProject;
+
+/**
+ *
+ * @author FibreFoX
+ */
+public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBundler {
+
+    private final String jmodWithLauncherBinaries = "jdk.packager.jmod";
+
+    @Override
+    public File bundleApp(String jdkPath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException {
+        // as since JDK 9 the resource-files are inside a jmod-file (non opened), as a workaround I'm using
+        // the "jmod"-binary to extract the whole "jdk.packager.jmod"-file temporary
+        // "native binaries" (bootstrapping launchers) are expecting the application sitting inside some "app"-folder aside of the native launcher
+        // .\jmod.exe extract --dir C:\Users\FibreFoX\Desktop\blub ..\jmods\jdk.packager.jmod
+        File outputFolderForJavaApp = outputBaseFolder.toPath().resolve("windows-x64").resolve("app").toFile();
+        if( !outputFolderForJavaApp.exists() && !outputFolderForJavaApp.mkdirs() ){
+            throw new MojoFailureException("Not possible to create output folder: " + outputFolderForJavaApp.getAbsolutePath());
+        }
+
+        // copy source bundle to nested app-folder (requirement of the native launcher from the jdk-executable)
+        try{
+            internalUtils.copyRecursive(sourceFolder.toPath(), outputFolderForJavaApp.toPath());
+        } catch(IOException ex){
+            throw new MojoFailureException(null, ex);
+        }
+
+        boolean isUsingJmodFiles = Files.exists(new File(jdkPath).toPath().resolve("jmods"), LinkOption.NOFOLLOW_LINKS);
+        if( isUsingJmodFiles ){
+            // check if required jmod file is existing
+            if( !new File(jdkPath).toPath().resolve("jmods").resolve(jmodWithLauncherBinaries).toFile().exists() ){
+                throw new MojoExecutionException("Missing JMOD-file: " + jmodWithLauncherBinaries);
+            }
+
+            List<String> command = new ArrayList<>();
+            command.add("jmod");
+            command.add("extract");
+            command.add("--dir");
+            command.add(tempWorkfolder.getAbsolutePath());
+            command.add(jdkPath + File.separator + "jmods" + File.separator + jmodWithLauncherBinaries);
+
+            ProcessBuilder extractionProcess = new ProcessBuilder()
+                    .inheritIO()
+                    .directory(project.getBasedir())
+                    .command(command);
+            try{
+                Process p = extractionProcess.start();
+                p.waitFor();
+                if( p.exitValue() != 0 ){
+                    throw new MojoExecutionException("Could not extract JMOD " + jmodWithLauncherBinaries);
+                }
+            } catch(IOException | InterruptedException ex){
+                throw new MojoExecutionException(null, ex);
+            }
+            Path windowsBinariesSource = tempWorkfolder.toPath().resolve("classes").resolve("com").resolve("oracle").resolve("tools").resolve("packager").resolve("windows");
+
+            // copy all DLL-files
+            try{
+                Path targetFolder = outputBaseFolder.toPath().resolve("windows-x64");
+                // TODO refactor this into utils-method
+                Files.walkFileTree(windowsBinariesSource, new FileVisitor<Path>() {
+
+                    boolean enteredFolder = false;
+
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path subfolder, BasicFileAttributes attrs) throws IOException {
+                        if( enteredFolder ){
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+                        enteredFolder = true;
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path sourceFile, BasicFileAttributes attrs) throws IOException {
+                        // do copy, and replace, as the resource might already be existing
+                        if( sourceFile.toFile().getName().endsWith(".dll") ){
+                            Files.copy(sourceFile, targetFolder.resolve(windowsBinariesSource.relativize(sourceFile)), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                        }
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path source, IOException ioe) throws IOException {
+                        // fail fast
+                        return FileVisitResult.TERMINATE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path source, IOException ioe) throws IOException {
+                        // nothing to do here
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch(IOException ex){
+                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+            }
+
+            // copy launcher files
+            Path windowsLauncherBinary = windowsBinariesSource.resolve("WinLauncher.exe");
+
+            // TODO check architecutre matching
+//            internalUtils.isWindowsExecutable64bit(windowsLauncherBinary);
+            nativeLaunchers.forEach(nativeLauncher -> {
+                try{
+                    String fileExtension = nativeLauncher.getExtension();
+                    if( fileExtension == null || fileExtension.trim().isEmpty() ){
+                        if( internalUtils.isPlatformWindows() ){
+                            fileExtension = "exe";
+                        }
+                    }
+                    Files.copy(windowsLauncherBinary, outputBaseFolder.toPath().resolve("windows-x64").resolve(nativeLauncher.getFilename() + "." + fileExtension), StandardCopyOption.REPLACE_EXISTING);
+                } catch(IOException ex){
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                }
+            });
+        } else {
+            // assume we are using JDK prior JDK 9 (8,7,...)
+            // on JDK prior JDK 9, java.home points to the JRE inside the JDK
+            Path antJfxJar = new File(jdkPath).toPath().resolve("lib").resolve("ant-javafx.jar");
+            Path antJfxJarinParentFolder = new File(jdkPath).toPath().getParent().resolve("lib").resolve("ant-javafx.jar");
+//            System.out.println("Checking: " + antJfxJar.toFile().getAbsolutePath());
+//            System.out.println("Checking: " + antJfxJarinParentFolder.toFile().getAbsolutePath());
+            if( !antJfxJar.toFile().exists() && !antJfxJarinParentFolder.toFile().exists() ){
+                // javafx files are not yet installed
+                throw new MojoExecutionException("Required JavaFX file was not found: ant-javafx.jar, please make sure to have some javafx installed");
+            }
+            System.out.println("Would work on JDK 8 file schema");
+            // TODO
+        }
+        // TODO create launcher cfg-files
+        return null;
+    }
+
+    @Override
+    public boolean checkRequirements(String jdkPath) {
+        return true;
+    }
+
+    @Override
+    public boolean creatableOnBuildsystem(OS os) {
+        return os == OS.WINDOWS;
+    }
+
+    @Override
+    public String getBundlerIdentifier() {
+        return "oracle-native-launcher";
+    }
+
+    @Override
+    public OS getClientOS() {
+        return OS.WINDOWS;
+    }
+
+    @Override
+    public void printHelp() {
+        return;
+    }
+
+}
