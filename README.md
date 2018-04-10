@@ -4,8 +4,11 @@
 # WORK IN PROGRESS
 
 * This is intended to replace the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), as this is a rewrite of the whole contept, without the requirement for the OpenJFX/JavaFX-part being installed.
-* Issue-section will be opened once this plugin is released
-* pull-requests are getting ignored and closed unseed
+* **Issue-section will be opened once this plugin is released**
+* **pull-requests are getting ignored and closed unseed until this plugin is released**
+* unlike the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), this maven-plugin does not rely on the installed JavaFX/OpenJFX parts, but it re-uses the files that are coming with, so make sure to have them installed aswell (the roadmap contains a rewrite of the native launcher part)
+* no batteries included: every bundle-type except "java-app" is done in a separate project, making this maven-plugin like a nice bootstrapper for custom bundlers
+* please look in the [test-projects](maven-plugin/src/it/) to have some insight whats coming up
 
 # Easy creationg of shareable software bundles for your Java application
 
