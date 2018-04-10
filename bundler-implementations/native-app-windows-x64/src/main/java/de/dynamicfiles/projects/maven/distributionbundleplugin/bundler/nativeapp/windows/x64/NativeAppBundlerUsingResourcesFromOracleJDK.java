@@ -136,8 +136,13 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             // copy launcher files
             Path windowsLauncherBinary = windowsBinariesSource.resolve("WinLauncher.exe");
 
-            // TODO check architecutre matching
-//            internalUtils.isWindowsExecutable64bit(windowsLauncherBinary);
+            // check architecutre matching
+            boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(windowsLauncherBinary);
+            if( !bitCheckOfLauncherMatching ){
+                // 32 bit -> quit work, wrong configured jdk
+                throw new MojoExecutionException("Provided JDK did not contain correct bit architecture, please provide some 64bit JDK");
+            }
+
             nativeLaunchers.forEach(nativeLauncher -> {
                 try{
                     String fileExtension = nativeLauncher.getExtension();
