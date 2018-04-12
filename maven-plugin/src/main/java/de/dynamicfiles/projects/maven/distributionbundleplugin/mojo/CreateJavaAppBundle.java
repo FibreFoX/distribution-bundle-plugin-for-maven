@@ -42,15 +42,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.apache.maven.execution.MavenSession;
 
 import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 
@@ -74,6 +79,12 @@ public class CreateJavaAppBundle extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true)
     private MavenProject project;
 
+    @Parameter(defaultValue = "${mojoExecution}", readonly = true)
+    private MojoExecution mojoExecution;
+
+    @Parameter(defaultValue = "${session}", readonly = true)
+    private MavenSession session;
+
     @Component
     private MavenProjectHelper projectHelper;
 
@@ -86,7 +97,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
     /**
      * Specify where the bundle should be generated to.
      */
-    @Parameter(defaultValue = "${project.build.directory}/bundles/java-app")
+    @Parameter(defaultValue = "${project.build.directory}/distbundle/java-app")
     private File outputFolder;
 
     /**
@@ -126,7 +137,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
     /**
      * Specify the folder, where the dependencies are going to be placed.
      */
-    @Parameter(defaultValue = "${project.build.directory}/bundles/java-app/lib")
+    @Parameter(defaultValue = "${project.build.directory}/distbundle/java-app/lib")
     private File outputLibFolder;
 
     /**
@@ -144,7 +155,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private File additionalAppResources;
 
     /**
-     * Same as additionalAppResources, but can used for defining multiple sources.
+     * Same as additionalAppResources, but can used for defining multiple sources. Can be a simple file instead of a folder.
      */
     @Parameter
     private List<File> additionalAppResourcesList;
@@ -248,8 +259,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
     /**
      * Attaching some artifact to the project can be fine-tuned by the artifact classifier. To adjust that classifier, just set this parameter.
      */
-    @Parameter(defaultValue = "app-bundle")
+    @Parameter(defaultValue = "java-app-bundle")
     private String targetClassifier;
+
+    @Parameter(defaultValue = "${project.build.directory}/distbundle.java-app-executions.tmp", readonly = true)
+    private File mojoExecutionTrackingFile;
 
     private final InternalUtils internalUtils = new InternalUtils();
 
@@ -258,6 +272,9 @@ public class CreateJavaAppBundle extends AbstractMojo {
         if( !"jar".equalsIgnoreCase(project.getPackaging()) ){
             throw new MojoExecutionException(String.format("Projects with packaging '%s' are not supported", project.getPackaging()));
         }
+
+        Properties settingsForThisRun = new Properties();
+
         // prepare target area
         if( verbose ){
             getLog().info("Prepare target area: " + outputFolder.toString());
@@ -320,8 +337,9 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
         boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
 
-        if( verbose ){
-            if( hasCustomMainClass ){
+        if( hasCustomMainClass ){
+            settingsForThisRun.put("mainClass", mainClass);
+            if( verbose ){
                 getLog().info("Custom main-class was defined: " + mainClass);
             }
         }
@@ -339,6 +357,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                             if( verbose ){
                                 getLog().info("Found registered main-class inside JAR file");
                             }
+
+                            // record this for later, making it easier to detect configuration-mismatches later
+                            settingsForThisRun.put("mainClass.detected", registeredMainClass);
+
                             hasRegisteredMainClass.set(true);
                             registeredMainClassMatchesConfiguredMainClass.set(true);
                             // check if main-class is the correct one
@@ -427,7 +449,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                                 File targetLibFile = outputLibFolder.toPath().resolve(dependencyFilePath.getName()).toFile();
                                 try{
                                     Files.copy(dependencyFilePath.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                                    copiedDependencies.add(targetLibFile.toPath().toString());
+                                    copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
                                 } catch(IOException ex){
                                     copyException.set(new MojoExecutionException("Could not copy system-scoped dependency, please check your build log.", ex));
                                 }
@@ -453,7 +475,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     File targetLibFile = outputLibFolder.toPath().resolve(dependencyArtifactFile.getName()).toFile();
                     try{
                         Files.copy(dependencyArtifactFile.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        copiedDependencies.add(targetLibFile.toPath().toString());
+                        copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
                     } catch(IOException ex){
                         copyException.set(new MojoExecutionException("Could not copy provided-scoped or runtime-scoped dependency, please check your build log.", ex));
                     }
@@ -554,6 +576,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
             // as app-folder and lib-folder might not be in the thought location, calculate relative location
             String resultingClasspath = String.join(" ", pathCorrectedClasspathEntries);
+            settingsForThisRun.put("generateClasspath.generated", resultingClasspath);
 
             Map<String, String> env = new HashMap<>();
             URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
@@ -719,6 +742,22 @@ public class CreateJavaAppBundle extends AbstractMojo {
             if( verbose ){
                 getLog().info("Creating packed bundle (ZIP-file)...");
             }
+            // TODO check if for given classifier was already created in a prior execution
+
+            if( !mojoExecutionTrackingFile.exists() ){
+                try{
+                    mojoExecutionTrackingFile.createNewFile();
+                } catch(IOException ex){
+                    Logger.getLogger(CreateJavaAppBundle.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+            if( targetClassifier == null || targetClassifier.trim().isEmpty() ){
+                getLog().warn("Provided bundle artifact classifier was invalid, using default one...");
+                // fix this wrong configuration (do not fail, as we already got this far)
+                targetClassifier = "java-app-bundle";
+            }
+
             // add to project artifacts, zipped
             File targetZippedArtifact = new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-" + targetClassifier + ".zip");
             if( targetZippedArtifact.exists() ){
@@ -737,6 +776,71 @@ public class CreateJavaAppBundle extends AbstractMojo {
             } catch(IOException ex){
                 throw new MojoExecutionException("Could not create packed bundle, please check your build log.", ex);
             }
+        }
+
+        if( verbose ){
+            getLog().info("Writing mojo execution configuration log...");
+        }
+
+        // TODO write property-file even when having some exception (for debugging-purpose)
+        // write property-file which contains the whole configuration used for this mojo-execution
+        // here is why:
+        // * for debugging-purpose when opening a bug-ticket/issue at github
+        // * for taking some configurations over to the next mojo (native-app) like main jar + main class
+        settingsForThisRun.put("verbose", String.valueOf(verbose));
+        settingsForThisRun.put("outputFolder", outputFolder.getAbsolutePath());
+        settingsForThisRun.put("cleanupOutputFolder", String.valueOf(cleanupOutputFolder));
+        Optional.ofNullable(sourceClassifier).ifPresent(classifier -> {
+            settingsForThisRun.put("sourceClassifier", classifier);
+        });
+        // mainclass will be set above
+        settingsForThisRun.put("ignoreMainClassMismatch", String.valueOf(ignoreMainClassMismatch));
+        settingsForThisRun.put("copyDependencies", String.valueOf(copyDependencies));
+        settingsForThisRun.put("outputLibFolder", outputLibFolder.getAbsolutePath());
+        // this folder might be removed due to being empty
+        if( outputLibFolder.exists() ){
+            settingsForThisRun.put("outputLibFolder.entries", String.valueOf(outputLibFolder.list().length));
+        } else {
+            settingsForThisRun.put("outputLibFolder.entries", "0");
+        }
+        settingsForThisRun.put("copySystemDependencies", String.valueOf(copySystemDependencies));
+        settingsForThisRun.put("additionalAppResources", additionalAppResources.getAbsolutePath());
+        // this folder is optional
+        if( additionalAppResources.exists() ){
+            settingsForThisRun.put("additionalAppResources.entries", String.valueOf(additionalAppResources.list().length));
+        } else {
+            settingsForThisRun.put("additionalAppResources.entries", "0");
+        }
+        // this list of folders is optional
+        Optional.ofNullable(additionalAppResourcesList).ifPresent(resourcesList -> {
+            settingsForThisRun.put("additionalAppResourcesList.entries", String.valueOf(resourcesList.size()));
+        });
+        settingsForThisRun.put("generateClasspath", String.valueOf(generateClasspath));
+        settingsForThisRun.put("generateClasspathUsingLibFolder", String.valueOf(generateClasspathUsingLibFolder));
+        settingsForThisRun.put("generateClasspathUsingLibFolderFileFilter", String.valueOf(generateClasspathUsingLibFolderFileFilter));
+        settingsForThisRun.put("scanForMainClass", String.valueOf(scanForMainClass));
+        settingsForThisRun.put("scanForMainClassWithLocationPrefix", Optional.ofNullable(scanForMainClassWithLocationPrefix).orElse(""));
+        settingsForThisRun.put("signJars", String.valueOf(signJars));
+        settingsForThisRun.put("jdkPath", jdkPath);
+        Optional.ofNullable(signParameters).ifPresent(parameters -> {
+            settingsForThisRun.put("signParameters", String.join("|||", parameters));
+        });
+        settingsForThisRun.put("signJarsLibFilter", Optional.ofNullable(signJarsLibFilter).orElse(""));
+        settingsForThisRun.put("createPackedBundle", String.valueOf(createPackedBundle));
+        settingsForThisRun.put("attachAsArtifact", String.valueOf(attachAsArtifact));
+        settingsForThisRun.put("targetClassifier", targetClassifier);
+
+        String settingsFilename = "distbundle.java-app-execution." + mojoExecution.getExecutionId() + ".properties";
+        Path settingsTargetPath = new File(project.getBuild().getDirectory()).toPath().resolve(settingsFilename);
+        try{
+            Files.createFile(settingsTargetPath);
+        } catch(IOException ex){
+            // NO-OP will explode while writing ... stupid API :(
+        }
+        try(OutputStream settingsOutputStream = Files.newOutputStream(settingsTargetPath, StandardOpenOption.TRUNCATE_EXISTING)){
+            settingsForThisRun.store(settingsOutputStream, null);
+        } catch(IOException ex){
+            throw new MojoExecutionException(null, ex);
         }
     }
 }

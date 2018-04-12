@@ -27,11 +27,16 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
@@ -170,7 +175,62 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             System.out.println("Would work on JDK 8 file schema");
             // TODO
         }
+
+        AtomicReference<MojoExecutionException> configurationCreationException = new AtomicReference<>();
+
         // TODO create launcher cfg-files
+        nativeLaunchers.forEach(nativeLauncher -> {
+            if( configurationCreationException.get() != null ){
+                return;
+            }
+
+            // check if configuration was provided as normal string
+            System.out.println("configuration > '" + nativeLauncher.getConfiguration() + "'");
+
+            AtomicReference<String> configurationContent = new AtomicReference<>();
+
+            // first we check configuration file template being set
+            AtomicReference<IOException> configurationSourceFileException = new AtomicReference<>();
+            File configurationSourceFile = nativeLauncher.getConfigurationFile();
+            Optional.ofNullable(nativeLauncher.getConfigurationFile()).ifPresent(configFileTemplate -> {
+                System.out.println(String.format("Reading configuration file for launcher: '%s'", nativeLauncher.getFilename()));
+                try{
+                    if( !Files.exists(configFileTemplate.toPath(), LinkOption.NOFOLLOW_LINKS) ){
+                        throw new IOException("Configuration file not found at: " + configFileTemplate.getAbsolutePath());
+                    }
+                    configurationContent.set(String.join("\n", Files.readAllLines(configFileTemplate.toPath())));
+                } catch(IOException ex){
+                    configurationSourceFileException.set(ex);
+                }
+            });
+
+            if( configurationSourceFileException.get() != null ){
+                configurationCreationException.set(new MojoExecutionException(null, configurationSourceFileException.get()));
+                return;
+            }
+
+            // when no configuration file template was set, check "configuration" parameter
+            // TODO find better namen for "configuration" xD
+            if( configurationContent.get() == null ){
+                System.out.println(String.format("Using inline configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                String xmlConfiguration = nativeLauncher.getConfiguration();
+                // sanitize ugly line-spacings when being specified via xml
+                String[] xmlConfigurationLines = xmlConfiguration.split("(\r\n)|(\r)|(\n)");
+                List<String> sanitizedLines = Arrays.asList(xmlConfigurationLines)
+                        .stream()
+                        .map(line -> line.trim())
+                        .collect(Collectors.toList());
+                configurationContent.set(String.join("\n", sanitizedLines));
+            }
+
+            // if configuration template still is empty, use internal default one
+            if( configurationContent.get() == null ){
+                System.out.println(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                // TODO implement
+            }
+
+            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
+        });
         return null;
     }
 
