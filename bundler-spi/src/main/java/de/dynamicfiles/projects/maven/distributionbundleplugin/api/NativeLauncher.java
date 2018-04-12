@@ -15,6 +15,8 @@
  */
 package de.dynamicfiles.projects.maven.distributionbundleplugin.api;
 
+import java.io.File;
+
 /**
  *
  * @author FibreFoX
@@ -38,6 +40,12 @@ public class NativeLauncher {
      */
     private String configuration = null;
 
+    /**
+     * Same as "configuration", but is ment to point to a template-file. Using this parameter overrides the made
+     * configuration inside "configuration"-parameter.
+     */
+    private File configurationFile = null;
+
     public String getFilename() {
         return filename;
     }
@@ -60,6 +68,14 @@ public class NativeLauncher {
 
     public void setConfiguration(String configuration) {
         this.configuration = configuration;
+    }
+
+    public File getConfigurationFile() {
+        return configurationFile;
+    }
+
+    public void setConfigurationFile(File configurationFile) {
+        this.configurationFile = configurationFile;
     }
 
 }
