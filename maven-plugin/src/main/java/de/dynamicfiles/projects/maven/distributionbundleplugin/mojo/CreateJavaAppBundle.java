@@ -291,7 +291,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private Path copyArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoExecutionException {
-        // copy that artifact
         String artifactFileName = sourceToCopy.get().getName();
         if( verbose ){
             getLog().info("Copying artifact: " + artifactFileName);
@@ -415,7 +414,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private void signJarFiles(Path targetAppArtifact) throws MojoFailureException, MojoExecutionException {
-        // sign jar-files
         if( signJars ){
             if( verbose ){
                 getLog().info("Signing JAR files...");
@@ -526,7 +524,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
     private void scanForMainClassInsideJarFile(Path targetAppArtifact) throws MojoExecutionException {
         boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
-        // scan for main-class
         if( hasCustomMainClass && scanForMainClass ){
             if( verbose ){
                 getLog().info("Scanning for custom main-class...");
@@ -542,7 +539,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private void adjustClasspathInsideJarFile(Set<String> copiedDependencies, Properties settingsForThisRun, Path targetAppArtifact) throws MojoFailureException, MojoExecutionException {
-        // adjust classpath inside jar-file
         if( generateClasspath ){
             List<String> entriesForClasspath = new ArrayList<>();
             if( generateClasspathUsingLibFolder ){
@@ -629,7 +625,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private void copyAdditionalApplicationResources() throws MojoExecutionException {
-        // copy additional application resources (single source)
         if( additionalAppResources != null && additionalAppResources.exists() && additionalAppResources.list().length > 0 ){
             if( verbose ){
                 getLog().info("Copying additional application resources, using source: " + additionalAppResources.toString());
@@ -725,13 +720,12 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 throw copyException.get();
             }
 
-            // cleanup
+            // remove lib-folder, when nothing ended up there
             if( outputLibFolder.list().length == 0 ){
                 if( verbose ){
                     getLog().info("Removing lib-folder, as it was empty...");
                 }
 
-                // remove lib-folder, when nothing ended up there
                 outputLibFolder.delete();
             }
         }
@@ -790,7 +784,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 if( verbose ){
                     getLog().info("Trying to change main-class in manifest of JAR file.");
                 }
-                // first check if manifest-file exists at all
 
                 Map<String, String> env = new HashMap<>();
                 URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
@@ -800,6 +793,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     boolean hasManifestFile = false;
                     Manifest manifest = new Manifest();
 
+                    // first check if manifest-file exists at all
                     Path manifestFile = zipFS.getPath("/META-INF/MANIFEST.MF");
                     if( Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS) ){
                         hasManifestFile = true;
@@ -835,7 +829,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
         if( verbose ){
             getLog().info("Finding artifact to work on...");
         }
-        // refactor this, making normal artefact as "fallback" when no classifier is found (might reduce branches)
         if( sourceClassifier == null || String.valueOf(sourceClassifier).trim().isEmpty() ){
             if( verbose ){
                 getLog().info("Using default classifier");
@@ -863,7 +856,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private void prepareTargetArea() throws MojoFailureException {
-        // prepare target area
         if( verbose ){
             getLog().info("Prepare target area: " + outputFolder.toString());
         }
