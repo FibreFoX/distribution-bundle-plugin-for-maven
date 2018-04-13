@@ -52,7 +52,6 @@ import java.util.jar.Manifest;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import org.apache.maven.execution.MavenSession;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecution;
@@ -81,9 +80,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
     @Parameter(defaultValue = "${mojoExecution}", readonly = true)
     private MojoExecution mojoExecution;
-
-    @Parameter(defaultValue = "${session}", readonly = true)
-    private MavenSession session;
 
     @Component
     private MavenProjectHelper projectHelper;
