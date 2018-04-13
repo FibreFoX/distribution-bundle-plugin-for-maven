@@ -276,7 +276,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
         prepareTargetArea();
         AtomicReference<File> sourceToCopy = findArtifactToWorkOn();
         Path targetAppArtifact = copyArtifactToWorkOn(sourceToCopy);
-        writeMainClassToManifest(settingsForThisRun, targetAppArtifact);
+        maintainMainClassInManifest(settingsForThisRun, targetAppArtifact);
         Set<String> copiedDependencies = copyDependenciesToLibFolder();
         copyAdditionalApplicationResources();
         adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
@@ -289,7 +289,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private Path copyArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoExecutionException {
         String artifactFileName = sourceToCopy.get().getName();
         if( verbose ){
-            getLog().info("Copying artifact: " + artifactFileName);
+            getLog().info("Copying source artifact...");
+            getLog().info("Using source filename: " + artifactFileName);
         }
         Path targetAppArtifact = outputFolder.toPath().resolve(artifactFileName);
         try{
@@ -332,7 +333,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
                 if( attachAsArtifact ){
                     if( verbose ){
-                        getLog().info("Attaching packed bundle to project artifacts using classifier: " + targetClassifier);
+                        getLog().info("Attaching packed bundle to project artifacts using classifier '" + targetClassifier + "' ...");
                     }
                     projectHelper.attachArtifact(project, "zip", targetClassifier, targetZippedArtifact);
                 }
@@ -400,12 +401,12 @@ public class CreateJavaAppBundle extends AbstractMojo {
         try{
             Files.createFile(settingsTargetPath);
         } catch(IOException ex){
-            // NO-OP will explode while writing ... stupid API :(
+            throw new MojoExecutionException("Could not create execution log.", ex);
         }
         try(OutputStream settingsOutputStream = Files.newOutputStream(settingsTargetPath, StandardOpenOption.TRUNCATE_EXISTING)){
             settingsForThisRun.store(settingsOutputStream, null);
         } catch(IOException ex){
-            throw new MojoExecutionException(null, ex);
+            throw new MojoExecutionException("Could not write to execution log.", ex);
         }
     }
 
@@ -539,7 +540,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
             List<String> entriesForClasspath = new ArrayList<>();
             if( generateClasspathUsingLibFolder ){
                 if( verbose ){
-                    getLog().info("Generating classpath using entries inside lib-folder ...");
+                    getLog().info("Generating classpath using entries inside lib-folder...");
                 }
                 // prepare matcher
                 FileSystem libFolderFilesystem = outputLibFolder.toPath().getFileSystem();
@@ -623,7 +624,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private void copyAdditionalApplicationResources() throws MojoExecutionException {
         if( additionalAppResources != null && additionalAppResources.exists() && additionalAppResources.list().length > 0 ){
             if( verbose ){
-                getLog().info("Copying additional application resources, using source: " + additionalAppResources.toString());
+                getLog().info("Copying additional application resources...");
+                getLog().info("Using source: " + additionalAppResources.toString());
             }
             try{
                 internalUtils.copyRecursive(additionalAppResources.toPath(), outputFolder.toPath());
@@ -638,7 +640,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 return resourcesList != null && resourcesList.exists() && resourcesList.canRead() && resourcesList.list().length > 0;
             }).forEach(additionalResources -> {
                 if( verbose ){
-                    getLog().info("Copying additional application resources, using source: " + additionalResources.toString());
+                    getLog().info("Copying additional application resources...");
+                    getLog().info("Using source: " + additionalResources.toString());
                 }
                 // when having the first exception, skip all following tasks
                 if( copyException.get() == null ){
@@ -656,11 +659,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private Set<String> copyDependenciesToLibFolder() throws MojoFailureException, MojoExecutionException {
+        if( verbose ){
+            getLog().info("Copying registered dependencies...");
+        }
         Set<String> copiedDependencies = new LinkedHashSet<>();
         if( copyDependencies ){
-            if( verbose ){
-                getLog().info("Copying registered dependencies...");
-            }
             if( !outputLibFolder.exists() && !outputLibFolder.mkdirs() ){
                 throw new MojoFailureException("Not possible to create output library folder: " + outputLibFolder.getAbsolutePath());
             }
@@ -724,11 +727,18 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
                 outputLibFolder.delete();
             }
+        } else {
+            if( verbose ){
+                getLog().info("Skipped opying registered dependencies.");
+            }
         }
         return copiedDependencies;
     }
 
-    private void writeMainClassToManifest(Properties settingsForThisRun, Path targetAppArtifact) throws MojoExecutionException, MojoFailureException {
+    private void maintainMainClassInManifest(Properties settingsForThisRun, Path targetAppArtifact) throws MojoExecutionException, MojoFailureException {
+        if( verbose ){
+            getLog().info("Maintaining main-class in manifest...");
+        }
         boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
         if( hasCustomMainClass ){
             settingsForThisRun.put("mainClass", mainClass);
@@ -738,7 +748,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
         }
         try{
             if( verbose ){
-                getLog().info("Scanning JAR file for configured main-class");
+                getLog().info("Scanning JAR file for configured main-class...");
             }
             // scan if is already executable jar, otherwise rework this
             AtomicBoolean hasRegisteredMainClass = new AtomicBoolean(false);
@@ -748,7 +758,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     Optional.ofNullable(existingManifest.getMainAttributes().get(Attributes.Name.MAIN_CLASS)).ifPresent(registeredMainClass -> {
                         if( !String.valueOf(registeredMainClass).trim().isEmpty() ){
                             if( verbose ){
-                                getLog().info("Found registered main-class inside JAR file");
+                                getLog().info("Found registered main-class inside JAR file.");
                             }
 
                             // record this for later, making it easier to detect configuration-mismatches later
@@ -778,7 +788,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
             // rework or create manifest file with new entries
             if( hasCustomMainClass ){
                 if( verbose ){
-                    getLog().info("Trying to change main-class in manifest of JAR file.");
+                    getLog().info("Trying to change main-class in manifest of JAR file...");
                 }
 
                 Map<String, String> env = new HashMap<>();
@@ -821,10 +831,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
     }
 
     private AtomicReference<File> findArtifactToWorkOn() throws MojoFailureException {
-        AtomicReference<File> sourceToCopy = new AtomicReference<>();
         if( verbose ){
             getLog().info("Finding artifact to work on...");
         }
+        AtomicReference<File> sourceToCopy = new AtomicReference<>();
         if( sourceClassifier == null || String.valueOf(sourceClassifier).trim().isEmpty() ){
             if( verbose ){
                 getLog().info("Using default classifier");
