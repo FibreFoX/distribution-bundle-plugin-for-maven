@@ -275,53 +275,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
         Properties settingsForThisRun = new Properties();
 
-        // prepare target area
-        if( verbose ){
-            getLog().info("Prepare target area: " + outputFolder.toString());
-        }
-        if( outputFolder.exists() && cleanupOutputFolder ){
-            try{
-                if( verbose ){
-                    getLog().info("Deleting recursively: " + outputFolder.toString());
-                }
-                internalUtils.deleteRecursive(outputFolder.toPath());
-            } catch(IOException ex){
-                throw new MojoFailureException("Not possible to cleanup output folder: " + outputFolder.getAbsolutePath(), ex);
-            }
-        }
-        if( !outputFolder.exists() && !outputFolder.mkdirs() ){
-            throw new MojoFailureException("Not possible to create output folder: " + outputFolder.getAbsolutePath());
-        }
+        prepareTargetArea();
 
-        if( verbose ){
-            getLog().info("Finding artifact to work on...");
-        }
         // find artifact to work on
         AtomicReference<File> sourceToCopy = new AtomicReference<>();
-        // refactor this, making normal artefact as "fallback" when no classifier is found (might reduce branches)
-        if( sourceClassifier == null || String.valueOf(sourceClassifier).trim().isEmpty() ){
-            if( verbose ){
-                getLog().info("Using default classifier");
-            }
-            if( project.getArtifact().getFile() == null || !project.getArtifact().getFile().exists() ){
-                throw new MojoFailureException("There was no artifact to work on. Please check your build-log or reconfigure");
-            }
-            sourceToCopy.set(project.getArtifact().getFile());
-        } else {
-            if( verbose ){
-                getLog().info("Using custom classifier: " + sourceClassifier);
-            }
-            project.getAttachedArtifacts().forEach(attachedArtifact -> {
-                if( attachedArtifact.getClassifier().equalsIgnoreCase(sourceClassifier) ){
-                    if( attachedArtifact.getFile().exists() ){
-                        sourceToCopy.set(attachedArtifact.getFile());
-                    }
-                }
-            });
-            if( sourceToCopy.get() == null ){
-                throw new MojoFailureException(String.format("There was no artifact with qualifier %s to work on. Please check your build-log or reconfigure", sourceClassifier));
-            }
-        }
+        findArtifactToWorkOn(sourceToCopy);
 
         // copy artifact
         String artifactFileName = sourceToCopy.get().getName();
@@ -337,299 +295,129 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
         boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
 
-        if( hasCustomMainClass ){
-            settingsForThisRun.put("mainClass", mainClass);
+        writeMainClassToManifest(hasCustomMainClass, settingsForThisRun, targetAppArtifact);
+
+        Set<String> copiedDependencies = new LinkedHashSet<>();
+
+        copyDependenciesToLibFolder(copiedDependencies);
+        copyAdditionalApplicationResources();
+        adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
+        scanForMainClassInsideJarFile(hasCustomMainClass, targetAppArtifact);
+        signJarFiles(targetAppArtifact);
+        createPackedBundleAndAttachToProject();
+        writeMojoExecutionConfigurationLog(settingsForThisRun);
+    }
+
+    private void createPackedBundleAndAttachToProject() throws MojoExecutionException {
+        if( createPackedBundle ){
             if( verbose ){
-                getLog().info("Custom main-class was defined: " + mainClass);
+                getLog().info("Creating packed bundle (ZIP-file)...");
+            }
+            // TODO check if for given classifier was already created in a prior execution
+
+            if( !mojoExecutionTrackingFile.exists() ){
+                try{
+                    mojoExecutionTrackingFile.createNewFile();
+                } catch(IOException ex){
+                    Logger.getLogger(CreateJavaAppBundle.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+            if( targetClassifier == null || targetClassifier.trim().isEmpty() ){
+                getLog().warn("Provided bundle artifact classifier was invalid, using default one...");
+                // fix this wrong configuration (do not fail, as we already got this far)
+                targetClassifier = "java-app-bundle";
+            }
+
+            // add to project artifacts, zipped
+            File targetZippedArtifact = new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-" + targetClassifier + ".zip");
+            if( targetZippedArtifact.exists() ){
+                // always remove old file
+                targetZippedArtifact.delete();
+            }
+            try{
+                internalUtils.pack(outputFolder.toPath(), targetZippedArtifact.toPath());
+
+                if( attachAsArtifact ){
+                    if( verbose ){
+                        getLog().info("Attaching packed bundle to project artifacts using classifier: " + targetClassifier);
+                    }
+                    projectHelper.attachArtifact(project, "zip", targetClassifier, targetZippedArtifact);
+                }
+            } catch(IOException ex){
+                throw new MojoExecutionException("Could not create packed bundle, please check your build log.", ex);
             }
         }
+    }
+
+    private void writeMojoExecutionConfigurationLog(Properties settingsForThisRun) throws MojoExecutionException {
+        if( verbose ){
+            getLog().info("Writing mojo execution configuration log...");
+        }
+
+        // TODO write property-file even when having some exception (for debugging-purpose)
+        // write property-file which contains the whole configuration used for this mojo-execution
+        // here is why:
+        // * for debugging-purpose when opening a bug-ticket/issue at github
+        // * for taking some configurations over to the next mojo (native-app) like main jar + main class
+        settingsForThisRun.put("verbose", String.valueOf(verbose));
+        settingsForThisRun.put("outputFolder", outputFolder.getAbsolutePath());
+        settingsForThisRun.put("cleanupOutputFolder", String.valueOf(cleanupOutputFolder));
+        Optional.ofNullable(sourceClassifier).ifPresent(classifier -> {
+            settingsForThisRun.put("sourceClassifier", classifier);
+        });
+        // mainclass will be set above
+        settingsForThisRun.put("ignoreMainClassMismatch", String.valueOf(ignoreMainClassMismatch));
+        settingsForThisRun.put("copyDependencies", String.valueOf(copyDependencies));
+        settingsForThisRun.put("outputLibFolder", outputLibFolder.getAbsolutePath());
+        // this folder might be removed due to being empty
+        if( outputLibFolder.exists() ){
+            settingsForThisRun.put("outputLibFolder.entries", String.valueOf(outputLibFolder.list().length));
+        } else {
+            settingsForThisRun.put("outputLibFolder.entries", "0");
+        }
+        settingsForThisRun.put("copySystemDependencies", String.valueOf(copySystemDependencies));
+        settingsForThisRun.put("additionalAppResources", additionalAppResources.getAbsolutePath());
+        // this folder is optional
+        if( additionalAppResources.exists() ){
+            settingsForThisRun.put("additionalAppResources.entries", String.valueOf(additionalAppResources.list().length));
+        } else {
+            settingsForThisRun.put("additionalAppResources.entries", "0");
+        }
+        // this list of folders is optional
+        Optional.ofNullable(additionalAppResourcesList).ifPresent(resourcesList -> {
+            settingsForThisRun.put("additionalAppResourcesList.entries", String.valueOf(resourcesList.size()));
+        });
+        settingsForThisRun.put("generateClasspath", String.valueOf(generateClasspath));
+        settingsForThisRun.put("generateClasspathUsingLibFolder", String.valueOf(generateClasspathUsingLibFolder));
+        settingsForThisRun.put("generateClasspathUsingLibFolderFileFilter", String.valueOf(generateClasspathUsingLibFolderFileFilter));
+        settingsForThisRun.put("scanForMainClass", String.valueOf(scanForMainClass));
+        settingsForThisRun.put("scanForMainClassWithLocationPrefix", Optional.ofNullable(scanForMainClassWithLocationPrefix).orElse(""));
+        settingsForThisRun.put("signJars", String.valueOf(signJars));
+        settingsForThisRun.put("jdkPath", jdkPath);
+        Optional.ofNullable(signParameters).ifPresent(parameters -> {
+            settingsForThisRun.put("signParameters", String.join("|||", parameters));
+        });
+        settingsForThisRun.put("signJarsLibFilter", Optional.ofNullable(signJarsLibFilter).orElse(""));
+        settingsForThisRun.put("createPackedBundle", String.valueOf(createPackedBundle));
+        settingsForThisRun.put("attachAsArtifact", String.valueOf(attachAsArtifact));
+        settingsForThisRun.put("targetClassifier", targetClassifier);
+
+        String settingsFilename = "distbundle.java-app-execution." + mojoExecution.getExecutionId() + ".properties";
+        Path settingsTargetPath = new File(project.getBuild().getDirectory()).toPath().resolve(settingsFilename);
         try{
-            if( verbose ){
-                getLog().info("Scanning JAR file for configured main-class");
-            }
-            // scan if is already executable jar, otherwise rework this
-            AtomicBoolean hasRegisteredMainClass = new AtomicBoolean(false);
-            AtomicBoolean registeredMainClassMatchesConfiguredMainClass = new AtomicBoolean(false);
-            try(JarFile jarFile = new JarFile(targetAppArtifact.toFile())){
-                Optional.ofNullable(jarFile.getManifest()).ifPresent(existingManifest -> {
-                    Optional.ofNullable(existingManifest.getMainAttributes().get(Attributes.Name.MAIN_CLASS)).ifPresent(registeredMainClass -> {
-                        if( !String.valueOf(registeredMainClass).trim().isEmpty() ){
-                            if( verbose ){
-                                getLog().info("Found registered main-class inside JAR file");
-                            }
-
-                            // record this for later, making it easier to detect configuration-mismatches later
-                            settingsForThisRun.put("mainClass.detected", registeredMainClass);
-
-                            hasRegisteredMainClass.set(true);
-                            registeredMainClassMatchesConfiguredMainClass.set(true);
-                            // check if main-class is the correct one
-                            if( hasCustomMainClass ){
-                                if( !mainClass.equalsIgnoreCase(String.valueOf(registeredMainClass)) ){
-                                    registeredMainClassMatchesConfiguredMainClass.set(false);
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-
-            if( !hasRegisteredMainClass.get() && !hasCustomMainClass ){
-                throw new MojoFailureException("There is no main-class configured for the executable jar file. Please review your plugin-configuration.");
-            }
-
-            // warn about registeredMainClassMatchesConfiguredMainClass
-            if( ignoreMainClassMismatch ){
-                getLog().warn("The already existing main-class does not match the configured one. Please check if this is correct. You might want to set 'ignoreMainClassMismatch' to true to avoid this warning.");
-            }
-            // rework or create manifest file with new entries
-            if( hasCustomMainClass ){
-                if( verbose ){
-                    getLog().info("Trying to change main-class in manifest of JAR file.");
-                }
-                // first check if manifest-file exists at all
-
-                Map<String, String> env = new HashMap<>();
-                URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
-                // using explicit JAR URL syntax
-                URI uriToFileSystem = URI.create("jar:" + uriToJarFile.toString());
-                try(FileSystem zipFS = FileSystems.newFileSystem(uriToFileSystem, env, null)){
-                    boolean hasManifestFile = false;
-                    Manifest manifest = new Manifest();
-
-                    Path manifestFile = zipFS.getPath("/META-INF/MANIFEST.MF");
-                    if( Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS) ){
-                        hasManifestFile = true;
-                        // if it exists, load existing values
-                        try(InputStream manifestAsStream = Files.newInputStream(manifestFile, StandardOpenOption.READ)){
-                            manifest.read(manifestAsStream);
-                        }
-                    }
-
-                    // adjust manifest-entries 
-                    Attributes mainAttributes = manifest.getMainAttributes();
-                    if( !hasManifestFile ){
-                        mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                    }
-                    mainAttributes.put(Attributes.Name.MAIN_CLASS, mainClass.trim());
-
-                    if( verbose ){
-                        getLog().info("Changing/Writing main-class in manifest of JAR file...");
-                    }
-                    // (over)write it back to artifact
-                    try(OutputStream manifestOutput = Files.newOutputStream(manifestFile, StandardOpenOption.TRUNCATE_EXISTING)){
-                        manifest.write(manifestOutput);
-                    }
-                }
-            }
+            Files.createFile(settingsTargetPath);
+        } catch(IOException ex){
+            // NO-OP will explode while writing ... stupid API :(
+        }
+        try(OutputStream settingsOutputStream = Files.newOutputStream(settingsTargetPath, StandardOpenOption.TRUNCATE_EXISTING)){
+            settingsForThisRun.store(settingsOutputStream, null);
         } catch(IOException ex){
             throw new MojoExecutionException(null, ex);
         }
+    }
 
-        Set<String> copiedDependencies = new LinkedHashSet<>();
-        if( copyDependencies ){
-            if( verbose ){
-                getLog().info("Copying registered dependencies...");
-            }
-            if( !outputLibFolder.exists() && !outputLibFolder.mkdirs() ){
-                throw new MojoFailureException("Not possible to create output library folder: " + outputLibFolder.getAbsolutePath());
-            }
-
-            if( copySystemDependencies ){
-                if( verbose ){
-                    getLog().info("Copying registered system-scoped dependencies...");
-                }
-                AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
-                project.getDependencies().stream()
-                        .filter(dependency -> "system".equalsIgnoreCase(dependency.getScope()))
-                        .forEach(dependency -> {
-                            // when having the first exception, skip all following tasks
-                            if( copyException.get() == null ){
-                                File dependencyFilePath = new File(dependency.getSystemPath());
-                                File targetLibFile = outputLibFolder.toPath().resolve(dependencyFilePath.getName()).toFile();
-                                try{
-                                    Files.copy(dependencyFilePath.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                                    copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
-                                } catch(IOException ex){
-                                    copyException.set(new MojoExecutionException("Could not copy system-scoped dependency, please check your build log.", ex));
-                                }
-                            }
-                        });
-                if( copyException.get() != null ){
-                    throw copyException.get();
-                }
-            }
-            if( verbose ){
-                getLog().info("Copying registered provided-scoped and runtime-scoped dependencies...");
-            }
-
-            AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
-            project.getArtifacts().stream().filter(dependencyArtifact -> {
-                // filter all unreadable, non-file artifacts
-                File artifactFile = dependencyArtifact.getFile();
-                return artifactFile.isFile() && artifactFile.canRead();
-            }).forEach(dependencyArtifact -> {
-                // when having the first exception, skip all following tasks
-                if( copyException.get() == null ){
-                    File dependencyArtifactFile = dependencyArtifact.getFile();
-                    File targetLibFile = outputLibFolder.toPath().resolve(dependencyArtifactFile.getName()).toFile();
-                    try{
-                        Files.copy(dependencyArtifactFile.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
-                    } catch(IOException ex){
-                        copyException.set(new MojoExecutionException("Could not copy provided-scoped or runtime-scoped dependency, please check your build log.", ex));
-                    }
-                }
-            });
-
-            if( copyException.get() != null ){
-                throw copyException.get();
-            }
-
-            // cleanup
-            if( outputLibFolder.list().length == 0 ){
-                if( verbose ){
-                    getLog().info("Removing lib-folder, as it was empty...");
-                }
-
-                // remove lib-folder, when nothing ended up there
-                outputLibFolder.delete();
-            }
-        }
-
-        // copy additional application resources (single source)
-        if( additionalAppResources != null && additionalAppResources.exists() && additionalAppResources.list().length > 0 ){
-            if( verbose ){
-                getLog().info("Copying additional application resources, using source: " + additionalAppResources.toString());
-            }
-            try{
-                internalUtils.copyRecursive(additionalAppResources.toPath(), outputFolder.toPath());
-            } catch(IOException ex){
-                throw new MojoExecutionException("Could not copy additional application resources, please check your build log.", ex);
-            }
-        }
-
-        if( additionalAppResourcesList != null && !additionalAppResourcesList.isEmpty() ){
-            AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
-            additionalAppResourcesList.stream().filter(resourcesList -> {
-                return resourcesList != null && resourcesList.exists() && resourcesList.canRead() && resourcesList.list().length > 0;
-            }).forEach(additionalResources -> {
-                if( verbose ){
-                    getLog().info("Copying additional application resources, using source: " + additionalResources.toString());
-                }
-                // when having the first exception, skip all following tasks
-                if( copyException.get() == null ){
-                    try{
-                        internalUtils.copyRecursive(additionalResources.toPath(), outputFolder.toPath());
-                    } catch(IOException ex){
-                        copyException.set(new MojoExecutionException("Could not copy additional application resources, please check your build log.", ex));
-                    }
-                }
-            });
-            if( copyException.get() != null ){
-                throw copyException.get();
-            }
-        }
-
-        // adjust classpath inside jar-file
-        if( generateClasspath ){
-            List<String> entriesForClasspath = new ArrayList<>();
-            if( generateClasspathUsingLibFolder ){
-                if( verbose ){
-                    getLog().info("Generating classpath using entries inside lib-folder ...");
-                }
-                // prepare matcher
-                FileSystem libFolderFilesystem = outputLibFolder.toPath().getFileSystem();
-                PathMatcher pathMatcher = libFolderFilesystem.getPathMatcher("glob:" + generateClasspathUsingLibFolderFileFilter);
-                try{
-                    Files.walkFileTree(outputLibFolder.toPath(), new SimpleFileVisitor<Path>() {
-                        @Override
-                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                            Path relativeFileOfLib = outputLibFolder.toPath().relativize(file);
-                            if( pathMatcher.matches(relativeFileOfLib) ){
-                                entriesForClasspath.add(relativeFileOfLib.toString().replace("\\", "/"));
-                            }
-                            return FileVisitResult.CONTINUE;
-                        }
-                    });
-                } catch(IOException ioex){
-                    throw new MojoExecutionException(null, ioex);
-                }
-            } else {
-                if( verbose ){
-                    getLog().info("Generating classpath using registered and copied dependencies...");
-                }
-                // reusing recorded libs from normal dependencies
-                entriesForClasspath.addAll(copiedDependencies);
-            }
-
-            StringBuilder relativeLibFolderLocation = new StringBuilder(outputFolder.toPath().relativize(outputLibFolder.toPath()).toString().replace("\\", "/"));
-            // append slash when having some subfolder
-            if( relativeLibFolderLocation.length() > 0 ){
-                relativeLibFolderLocation.append("/");
-            }
-            final String relativeLibFolder = relativeLibFolderLocation.toString();
-
-            Set<String> pathCorrectedClasspathEntries = entriesForClasspath.stream()
-                    .map(entry -> relativeLibFolder + entry.replace("\\", "/"))
-                    .collect(Collectors.toSet());
-
-            // as app-folder and lib-folder might not be in the thought location, calculate relative location
-            String resultingClasspath = String.join(" ", pathCorrectedClasspathEntries);
-            settingsForThisRun.put("generateClasspath.generated", resultingClasspath);
-
-            Map<String, String> env = new HashMap<>();
-            URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
-            // using explicit JAR URL syntax
-            URI uriToFileSystem = URI.create("jar:" + uriToJarFile.toString());
-            try(FileSystem zipFS = FileSystems.newFileSystem(uriToFileSystem, env, null)){
-                boolean hasManifestFile = false;
-                Manifest manifest = new Manifest();
-
-                Path manifestFile = zipFS.getPath("/META-INF/MANIFEST.MF");
-                if( Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS) ){
-                    hasManifestFile = true;
-                    // if it exists, load existing values
-                    try(InputStream manifestAsStream = Files.newInputStream(manifestFile, StandardOpenOption.READ)){
-                        manifest.read(manifestAsStream);
-                    }
-                }
-
-                // adjust manifest-entries 
-                if( !hasManifestFile ){
-                    // fail the build, might happen when multiple processes are working in the same file in parallel
-                    throw new MojoFailureException("Could not find MANIFEST.MF inside generated jar-file.");
-                }
-
-                Attributes mainAttributes = manifest.getMainAttributes();
-                mainAttributes.put(Attributes.Name.CLASS_PATH, resultingClasspath.trim());
-
-                if( verbose ){
-                    getLog().info("Changing/Writing classpath in manifest of JAR file...");
-                }
-                // (over)write it back to artifact
-                try(OutputStream manifestOutput = Files.newOutputStream(manifestFile, StandardOpenOption.TRUNCATE_EXISTING)){
-                    manifest.write(manifestOutput);
-                }
-            } catch(IOException ex){
-                throw new MojoExecutionException(null, ex);
-            }
-        }
-
-        // scan for main-class
-        if( hasCustomMainClass && scanForMainClass ){
-            if( verbose ){
-                getLog().info("Scanning for custom main-class...");
-            }
-            String locationPrefix = scanForMainClassWithLocationPrefix;
-            if( locationPrefix == null ){
-                locationPrefix = "";
-            }
-            if( !internalUtils.isClassInsideJarFile(mainClass.trim(), locationPrefix, targetAppArtifact.toFile()) ){
-                throw new MojoExecutionException(String.format("Configured main-class '%s' was not found inside generated jar-file. Please check the built artifact or plugin-configuration.", mainClass));
-            }
-        }
-
+    private void signJarFiles(Path targetAppArtifact) throws MojoFailureException, MojoExecutionException {
         // sign jar-files
         if( signJars ){
             if( verbose ){
@@ -737,110 +525,357 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 throw signingException.get();
             }
         }
+    }
 
-        if( createPackedBundle ){
+    private void scanForMainClassInsideJarFile(boolean hasCustomMainClass, Path targetAppArtifact) throws MojoExecutionException {
+        // scan for main-class
+        if( hasCustomMainClass && scanForMainClass ){
             if( verbose ){
-                getLog().info("Creating packed bundle (ZIP-file)...");
+                getLog().info("Scanning for custom main-class...");
             }
-            // TODO check if for given classifier was already created in a prior execution
+            String locationPrefix = scanForMainClassWithLocationPrefix;
+            if( locationPrefix == null ){
+                locationPrefix = "";
+            }
+            if( !internalUtils.isClassInsideJarFile(mainClass.trim(), locationPrefix, targetAppArtifact.toFile()) ){
+                throw new MojoExecutionException(String.format("Configured main-class '%s' was not found inside generated jar-file. Please check the built artifact or plugin-configuration.", mainClass));
+            }
+        }
+    }
 
-            if( !mojoExecutionTrackingFile.exists() ){
-                try{
-                    mojoExecutionTrackingFile.createNewFile();
-                } catch(IOException ex){
-                    Logger.getLogger(CreateJavaAppBundle.class.getName()).log(Level.SEVERE, null, ex);
+    private void adjustClasspathInsideJarFile(Set<String> copiedDependencies, Properties settingsForThisRun, Path targetAppArtifact) throws MojoFailureException, MojoExecutionException {
+        // adjust classpath inside jar-file
+        if( generateClasspath ){
+            List<String> entriesForClasspath = new ArrayList<>();
+            if( generateClasspathUsingLibFolder ){
+                if( verbose ){
+                    getLog().info("Generating classpath using entries inside lib-folder ...");
                 }
+                // prepare matcher
+                FileSystem libFolderFilesystem = outputLibFolder.toPath().getFileSystem();
+                PathMatcher pathMatcher = libFolderFilesystem.getPathMatcher("glob:" + generateClasspathUsingLibFolderFileFilter);
+                try{
+                    Files.walkFileTree(outputLibFolder.toPath(), new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                            Path relativeFileOfLib = outputLibFolder.toPath().relativize(file);
+                            if( pathMatcher.matches(relativeFileOfLib) ){
+                                entriesForClasspath.add(relativeFileOfLib.toString().replace("\\", "/"));
+                            }
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+                } catch(IOException ioex){
+                    throw new MojoExecutionException(null, ioex);
+                }
+            } else {
+                if( verbose ){
+                    getLog().info("Generating classpath using registered and copied dependencies...");
+                }
+                // reusing recorded libs from normal dependencies
+                entriesForClasspath.addAll(copiedDependencies);
             }
 
-            if( targetClassifier == null || targetClassifier.trim().isEmpty() ){
-                getLog().warn("Provided bundle artifact classifier was invalid, using default one...");
-                // fix this wrong configuration (do not fail, as we already got this far)
-                targetClassifier = "java-app-bundle";
+            StringBuilder relativeLibFolderLocation = new StringBuilder(outputFolder.toPath().relativize(outputLibFolder.toPath()).toString().replace("\\", "/"));
+            // append slash when having some subfolder
+            if( relativeLibFolderLocation.length() > 0 ){
+                relativeLibFolderLocation.append("/");
             }
+            final String relativeLibFolder = relativeLibFolderLocation.toString();
 
-            // add to project artifacts, zipped
-            File targetZippedArtifact = new File(project.getBuild().getDirectory(), project.getBuild().getFinalName() + "-" + targetClassifier + ".zip");
-            if( targetZippedArtifact.exists() ){
-                // always remove old file
-                targetZippedArtifact.delete();
-            }
-            try{
-                internalUtils.pack(outputFolder.toPath(), targetZippedArtifact.toPath());
+            Set<String> pathCorrectedClasspathEntries = entriesForClasspath.stream()
+                    .map(entry -> relativeLibFolder + entry.replace("\\", "/"))
+                    .collect(Collectors.toSet());
 
-                if( attachAsArtifact ){
-                    if( verbose ){
-                        getLog().info("Attaching packed bundle to project artifacts using classifier: " + targetClassifier);
+            // as app-folder and lib-folder might not be in the thought location, calculate relative location
+            String resultingClasspath = String.join(" ", pathCorrectedClasspathEntries);
+            settingsForThisRun.put("generateClasspath.generated", resultingClasspath);
+
+            Map<String, String> env = new HashMap<>();
+            URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
+            // using explicit JAR URL syntax
+            URI uriToFileSystem = URI.create("jar:" + uriToJarFile.toString());
+            try(FileSystem zipFS = FileSystems.newFileSystem(uriToFileSystem, env, null)){
+                boolean hasManifestFile = false;
+                Manifest manifest = new Manifest();
+
+                Path manifestFile = zipFS.getPath("/META-INF/MANIFEST.MF");
+                if( Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS) ){
+                    hasManifestFile = true;
+                    // if it exists, load existing values
+                    try(InputStream manifestAsStream = Files.newInputStream(manifestFile, StandardOpenOption.READ)){
+                        manifest.read(manifestAsStream);
                     }
-                    projectHelper.attachArtifact(project, "zip", targetClassifier, targetZippedArtifact);
+                }
+
+                // adjust manifest-entries
+                if( !hasManifestFile ){
+                    // fail the build, might happen when multiple processes are working in the same file in parallel
+                    throw new MojoFailureException("Could not find MANIFEST.MF inside generated jar-file.");
+                }
+
+                Attributes mainAttributes = manifest.getMainAttributes();
+                mainAttributes.put(Attributes.Name.CLASS_PATH, resultingClasspath.trim());
+
+                if( verbose ){
+                    getLog().info("Changing/Writing classpath in manifest of JAR file...");
+                }
+                // (over)write it back to artifact
+                try(OutputStream manifestOutput = Files.newOutputStream(manifestFile, StandardOpenOption.TRUNCATE_EXISTING)){
+                    manifest.write(manifestOutput);
                 }
             } catch(IOException ex){
-                throw new MojoExecutionException("Could not create packed bundle, please check your build log.", ex);
+                throw new MojoExecutionException(null, ex);
+            }
+        }
+    }
+
+    private void copyAdditionalApplicationResources() throws MojoExecutionException {
+        // copy additional application resources (single source)
+        if( additionalAppResources != null && additionalAppResources.exists() && additionalAppResources.list().length > 0 ){
+            if( verbose ){
+                getLog().info("Copying additional application resources, using source: " + additionalAppResources.toString());
+            }
+            try{
+                internalUtils.copyRecursive(additionalAppResources.toPath(), outputFolder.toPath());
+            } catch(IOException ex){
+                throw new MojoExecutionException("Could not copy additional application resources, please check your build log.", ex);
             }
         }
 
-        if( verbose ){
-            getLog().info("Writing mojo execution configuration log...");
+        if( additionalAppResourcesList != null && !additionalAppResourcesList.isEmpty() ){
+            AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
+            additionalAppResourcesList.stream().filter(resourcesList -> {
+                return resourcesList != null && resourcesList.exists() && resourcesList.canRead() && resourcesList.list().length > 0;
+            }).forEach(additionalResources -> {
+                if( verbose ){
+                    getLog().info("Copying additional application resources, using source: " + additionalResources.toString());
+                }
+                // when having the first exception, skip all following tasks
+                if( copyException.get() == null ){
+                    try{
+                        internalUtils.copyRecursive(additionalResources.toPath(), outputFolder.toPath());
+                    } catch(IOException ex){
+                        copyException.set(new MojoExecutionException("Could not copy additional application resources, please check your build log.", ex));
+                    }
+                }
+            });
+            if( copyException.get() != null ){
+                throw copyException.get();
+            }
         }
+    }
 
-        // TODO write property-file even when having some exception (for debugging-purpose)
-        // write property-file which contains the whole configuration used for this mojo-execution
-        // here is why:
-        // * for debugging-purpose when opening a bug-ticket/issue at github
-        // * for taking some configurations over to the next mojo (native-app) like main jar + main class
-        settingsForThisRun.put("verbose", String.valueOf(verbose));
-        settingsForThisRun.put("outputFolder", outputFolder.getAbsolutePath());
-        settingsForThisRun.put("cleanupOutputFolder", String.valueOf(cleanupOutputFolder));
-        Optional.ofNullable(sourceClassifier).ifPresent(classifier -> {
-            settingsForThisRun.put("sourceClassifier", classifier);
-        });
-        // mainclass will be set above
-        settingsForThisRun.put("ignoreMainClassMismatch", String.valueOf(ignoreMainClassMismatch));
-        settingsForThisRun.put("copyDependencies", String.valueOf(copyDependencies));
-        settingsForThisRun.put("outputLibFolder", outputLibFolder.getAbsolutePath());
-        // this folder might be removed due to being empty
-        if( outputLibFolder.exists() ){
-            settingsForThisRun.put("outputLibFolder.entries", String.valueOf(outputLibFolder.list().length));
-        } else {
-            settingsForThisRun.put("outputLibFolder.entries", "0");
-        }
-        settingsForThisRun.put("copySystemDependencies", String.valueOf(copySystemDependencies));
-        settingsForThisRun.put("additionalAppResources", additionalAppResources.getAbsolutePath());
-        // this folder is optional
-        if( additionalAppResources.exists() ){
-            settingsForThisRun.put("additionalAppResources.entries", String.valueOf(additionalAppResources.list().length));
-        } else {
-            settingsForThisRun.put("additionalAppResources.entries", "0");
-        }
-        // this list of folders is optional
-        Optional.ofNullable(additionalAppResourcesList).ifPresent(resourcesList -> {
-            settingsForThisRun.put("additionalAppResourcesList.entries", String.valueOf(resourcesList.size()));
-        });
-        settingsForThisRun.put("generateClasspath", String.valueOf(generateClasspath));
-        settingsForThisRun.put("generateClasspathUsingLibFolder", String.valueOf(generateClasspathUsingLibFolder));
-        settingsForThisRun.put("generateClasspathUsingLibFolderFileFilter", String.valueOf(generateClasspathUsingLibFolderFileFilter));
-        settingsForThisRun.put("scanForMainClass", String.valueOf(scanForMainClass));
-        settingsForThisRun.put("scanForMainClassWithLocationPrefix", Optional.ofNullable(scanForMainClassWithLocationPrefix).orElse(""));
-        settingsForThisRun.put("signJars", String.valueOf(signJars));
-        settingsForThisRun.put("jdkPath", jdkPath);
-        Optional.ofNullable(signParameters).ifPresent(parameters -> {
-            settingsForThisRun.put("signParameters", String.join("|||", parameters));
-        });
-        settingsForThisRun.put("signJarsLibFilter", Optional.ofNullable(signJarsLibFilter).orElse(""));
-        settingsForThisRun.put("createPackedBundle", String.valueOf(createPackedBundle));
-        settingsForThisRun.put("attachAsArtifact", String.valueOf(attachAsArtifact));
-        settingsForThisRun.put("targetClassifier", targetClassifier);
+    private void copyDependenciesToLibFolder(Set<String> copiedDependencies) throws MojoFailureException, MojoExecutionException {
+        if( copyDependencies ){
+            if( verbose ){
+                getLog().info("Copying registered dependencies...");
+            }
+            if( !outputLibFolder.exists() && !outputLibFolder.mkdirs() ){
+                throw new MojoFailureException("Not possible to create output library folder: " + outputLibFolder.getAbsolutePath());
+            }
 
-        String settingsFilename = "distbundle.java-app-execution." + mojoExecution.getExecutionId() + ".properties";
-        Path settingsTargetPath = new File(project.getBuild().getDirectory()).toPath().resolve(settingsFilename);
+            if( copySystemDependencies ){
+                if( verbose ){
+                    getLog().info("Copying registered system-scoped dependencies...");
+                }
+                AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
+                project.getDependencies().stream()
+                        .filter(dependency -> "system".equalsIgnoreCase(dependency.getScope()))
+                        .forEach(dependency -> {
+                            // when having the first exception, skip all following tasks
+                            if( copyException.get() == null ){
+                                File dependencyFilePath = new File(dependency.getSystemPath());
+                                File targetLibFile = outputLibFolder.toPath().resolve(dependencyFilePath.getName()).toFile();
+                                try{
+                                    Files.copy(dependencyFilePath.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                                    copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
+                                } catch(IOException ex){
+                                    copyException.set(new MojoExecutionException("Could not copy system-scoped dependency, please check your build log.", ex));
+                                }
+                            }
+                        });
+                if( copyException.get() != null ){
+                    throw copyException.get();
+                }
+            }
+            if( verbose ){
+                getLog().info("Copying registered provided-scoped and runtime-scoped dependencies...");
+            }
+
+            AtomicReference<MojoExecutionException> copyException = new AtomicReference<>();
+            project.getArtifacts().stream().filter(dependencyArtifact -> {
+                // filter all unreadable, non-file artifacts
+                File artifactFile = dependencyArtifact.getFile();
+                return artifactFile.isFile() && artifactFile.canRead();
+            }).forEach(dependencyArtifact -> {
+                // when having the first exception, skip all following tasks
+                if( copyException.get() == null ){
+                    File dependencyArtifactFile = dependencyArtifact.getFile();
+                    File targetLibFile = outputLibFolder.toPath().resolve(dependencyArtifactFile.getName()).toFile();
+                    try{
+                        Files.copy(dependencyArtifactFile.toPath(), targetLibFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
+                    } catch(IOException ex){
+                        copyException.set(new MojoExecutionException("Could not copy provided-scoped or runtime-scoped dependency, please check your build log.", ex));
+                    }
+                }
+            });
+
+            if( copyException.get() != null ){
+                throw copyException.get();
+            }
+
+            // cleanup
+            if( outputLibFolder.list().length == 0 ){
+                if( verbose ){
+                    getLog().info("Removing lib-folder, as it was empty...");
+                }
+
+                // remove lib-folder, when nothing ended up there
+                outputLibFolder.delete();
+            }
+        }
+    }
+
+    private void writeMainClassToManifest(boolean hasCustomMainClass, Properties settingsForThisRun, Path targetAppArtifact) throws MojoExecutionException, MojoFailureException {
+        if( hasCustomMainClass ){
+            settingsForThisRun.put("mainClass", mainClass);
+            if( verbose ){
+                getLog().info("Custom main-class was defined: " + mainClass);
+            }
+        }
         try{
-            Files.createFile(settingsTargetPath);
-        } catch(IOException ex){
-            // NO-OP will explode while writing ... stupid API :(
-        }
-        try(OutputStream settingsOutputStream = Files.newOutputStream(settingsTargetPath, StandardOpenOption.TRUNCATE_EXISTING)){
-            settingsForThisRun.store(settingsOutputStream, null);
+            if( verbose ){
+                getLog().info("Scanning JAR file for configured main-class");
+            }
+            // scan if is already executable jar, otherwise rework this
+            AtomicBoolean hasRegisteredMainClass = new AtomicBoolean(false);
+            AtomicBoolean registeredMainClassMatchesConfiguredMainClass = new AtomicBoolean(false);
+            try(JarFile jarFile = new JarFile(targetAppArtifact.toFile())){
+                Optional.ofNullable(jarFile.getManifest()).ifPresent(existingManifest -> {
+                    Optional.ofNullable(existingManifest.getMainAttributes().get(Attributes.Name.MAIN_CLASS)).ifPresent(registeredMainClass -> {
+                        if( !String.valueOf(registeredMainClass).trim().isEmpty() ){
+                            if( verbose ){
+                                getLog().info("Found registered main-class inside JAR file");
+                            }
+
+                            // record this for later, making it easier to detect configuration-mismatches later
+                            settingsForThisRun.put("mainClass.detected", registeredMainClass);
+
+                            hasRegisteredMainClass.set(true);
+                            registeredMainClassMatchesConfiguredMainClass.set(true);
+                            // check if main-class is the correct one
+                            if( hasCustomMainClass ){
+                                if( !mainClass.equalsIgnoreCase(String.valueOf(registeredMainClass)) ){
+                                    registeredMainClassMatchesConfiguredMainClass.set(false);
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+
+            if( !hasRegisteredMainClass.get() && !hasCustomMainClass ){
+                throw new MojoFailureException("There is no main-class configured for the executable jar file. Please review your plugin-configuration.");
+            }
+
+            // warn about registeredMainClassMatchesConfiguredMainClass
+            if( ignoreMainClassMismatch ){
+                getLog().warn("The already existing main-class does not match the configured one. Please check if this is correct. You might want to set 'ignoreMainClassMismatch' to true to avoid this warning.");
+            }
+            // rework or create manifest file with new entries
+            if( hasCustomMainClass ){
+                if( verbose ){
+                    getLog().info("Trying to change main-class in manifest of JAR file.");
+                }
+                // first check if manifest-file exists at all
+
+                Map<String, String> env = new HashMap<>();
+                URI uriToJarFile = targetAppArtifact.toAbsolutePath().toUri();
+                // using explicit JAR URL syntax
+                URI uriToFileSystem = URI.create("jar:" + uriToJarFile.toString());
+                try(FileSystem zipFS = FileSystems.newFileSystem(uriToFileSystem, env, null)){
+                    boolean hasManifestFile = false;
+                    Manifest manifest = new Manifest();
+
+                    Path manifestFile = zipFS.getPath("/META-INF/MANIFEST.MF");
+                    if( Files.exists(manifestFile, LinkOption.NOFOLLOW_LINKS) ){
+                        hasManifestFile = true;
+                        // if it exists, load existing values
+                        try(InputStream manifestAsStream = Files.newInputStream(manifestFile, StandardOpenOption.READ)){
+                            manifest.read(manifestAsStream);
+                        }
+                    }
+
+                    // adjust manifest-entries
+                    Attributes mainAttributes = manifest.getMainAttributes();
+                    if( !hasManifestFile ){
+                        mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+                    }
+                    mainAttributes.put(Attributes.Name.MAIN_CLASS, mainClass.trim());
+
+                    if( verbose ){
+                        getLog().info("Changing/Writing main-class in manifest of JAR file...");
+                    }
+                    // (over)write it back to artifact
+                    try(OutputStream manifestOutput = Files.newOutputStream(manifestFile, StandardOpenOption.TRUNCATE_EXISTING)){
+                        manifest.write(manifestOutput);
+                    }
+                }
+            }
         } catch(IOException ex){
             throw new MojoExecutionException(null, ex);
+        }
+    }
+
+    private void findArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoFailureException {
+        if( verbose ){
+            getLog().info("Finding artifact to work on...");
+        }
+        // refactor this, making normal artefact as "fallback" when no classifier is found (might reduce branches)
+        if( sourceClassifier == null || String.valueOf(sourceClassifier).trim().isEmpty() ){
+            if( verbose ){
+                getLog().info("Using default classifier");
+            }
+            if( project.getArtifact().getFile() == null || !project.getArtifact().getFile().exists() ){
+                throw new MojoFailureException("There was no artifact to work on. Please check your build-log or reconfigure");
+            }
+            sourceToCopy.set(project.getArtifact().getFile());
+        } else {
+            if( verbose ){
+                getLog().info("Using custom classifier: " + sourceClassifier);
+            }
+            project.getAttachedArtifacts().forEach(attachedArtifact -> {
+                if( attachedArtifact.getClassifier().equalsIgnoreCase(sourceClassifier) ){
+                    if( attachedArtifact.getFile().exists() ){
+                        sourceToCopy.set(attachedArtifact.getFile());
+                    }
+                }
+            });
+            if( sourceToCopy.get() == null ){
+                throw new MojoFailureException(String.format("There was no artifact with qualifier %s to work on. Please check your build-log or reconfigure", sourceClassifier));
+            }
+        }
+    }
+
+    private void prepareTargetArea() throws MojoFailureException {
+        // prepare target area
+        if( verbose ){
+            getLog().info("Prepare target area: " + outputFolder.toString());
+        }
+        if( outputFolder.exists() && cleanupOutputFolder ){
+            try{
+                if( verbose ){
+                    getLog().info("Deleting recursively: " + outputFolder.toString());
+                }
+                internalUtils.deleteRecursive(outputFolder.toPath());
+            } catch(IOException ex){
+                throw new MojoFailureException("Not possible to cleanup output folder: " + outputFolder.getAbsolutePath(), ex);
+            }
+        }
+        if( !outputFolder.exists() && !outputFolder.mkdirs() ){
+            throw new MojoFailureException("Not possible to create output folder: " + outputFolder.getAbsolutePath());
         }
     }
 }
