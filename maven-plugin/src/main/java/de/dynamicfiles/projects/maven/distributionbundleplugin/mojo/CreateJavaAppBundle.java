@@ -273,15 +273,15 @@ public class CreateJavaAppBundle extends AbstractMojo {
             throw new MojoExecutionException(String.format("Projects with packaging '%s' are not supported", project.getPackaging()));
         }
 
+        // we are recording some stuff, therefor prepare our "logger"
         Properties settingsForThisRun = new Properties();
 
         prepareTargetArea();
 
-        // find artifact to work on
         AtomicReference<File> sourceToCopy = new AtomicReference<>();
         findArtifactToWorkOn(sourceToCopy);
 
-        // copy artifact
+        // copy that artifact
         String artifactFileName = sourceToCopy.get().getName();
         if( verbose ){
             getLog().info("Copying artifact: " + artifactFileName);
