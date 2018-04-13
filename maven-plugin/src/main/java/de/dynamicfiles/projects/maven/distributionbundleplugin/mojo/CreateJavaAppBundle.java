@@ -276,9 +276,21 @@ public class CreateJavaAppBundle extends AbstractMojo {
         // we are recording some stuff, therefor prepare our "logger"
         Properties settingsForThisRun = new Properties();
 
+        // method-calls to each part of bundling
         prepareTargetArea();
         AtomicReference<File> sourceToCopy = findArtifactToWorkOn();
+        Path targetAppArtifact = copyArtifactToWorkOn(sourceToCopy);
+        writeMainClassToManifest(settingsForThisRun, targetAppArtifact);
+        Set<String> copiedDependencies = copyDependenciesToLibFolder();
+        copyAdditionalApplicationResources();
+        adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
+        scanForMainClassInsideJarFile(targetAppArtifact);
+        signJarFiles(targetAppArtifact);
+        createPackedBundleAndAttachToProject();
+        writeMojoExecutionConfigurationLog(settingsForThisRun);
+    }
 
+    private Path copyArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoExecutionException {
         // copy that artifact
         String artifactFileName = sourceToCopy.get().getName();
         if( verbose ){
@@ -290,15 +302,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
         } catch(IOException ex){
             throw new MojoExecutionException(null, ex);
         }
-
-        writeMainClassToManifest(settingsForThisRun, targetAppArtifact);
-        Set<String> copiedDependencies = copyDependenciesToLibFolder();
-        copyAdditionalApplicationResources();
-        adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
-        scanForMainClassInsideJarFile(targetAppArtifact);
-        signJarFiles(targetAppArtifact);
-        createPackedBundleAndAttachToProject();
-        writeMojoExecutionConfigurationLog(settingsForThisRun);
+        return targetAppArtifact;
     }
 
     private void createPackedBundleAndAttachToProject() throws MojoExecutionException {
