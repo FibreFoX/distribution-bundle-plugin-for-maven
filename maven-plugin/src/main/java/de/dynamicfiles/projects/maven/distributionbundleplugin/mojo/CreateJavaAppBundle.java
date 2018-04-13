@@ -277,9 +277,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
         Properties settingsForThisRun = new Properties();
 
         prepareTargetArea();
-
-        AtomicReference<File> sourceToCopy = new AtomicReference<>();
-        findArtifactToWorkOn(sourceToCopy);
+        AtomicReference<File> sourceToCopy = findArtifactToWorkOn();
 
         // copy that artifact
         String artifactFileName = sourceToCopy.get().getName();
@@ -293,16 +291,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
             throw new MojoExecutionException(null, ex);
         }
 
-        boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
-
-        writeMainClassToManifest(hasCustomMainClass, settingsForThisRun, targetAppArtifact);
-
-        Set<String> copiedDependencies = new LinkedHashSet<>();
-
-        copyDependenciesToLibFolder(copiedDependencies);
+        writeMainClassToManifest(settingsForThisRun, targetAppArtifact);
+        Set<String> copiedDependencies = copyDependenciesToLibFolder();
         copyAdditionalApplicationResources();
         adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
-        scanForMainClassInsideJarFile(hasCustomMainClass, targetAppArtifact);
+        scanForMainClassInsideJarFile(targetAppArtifact);
         signJarFiles(targetAppArtifact);
         createPackedBundleAndAttachToProject();
         writeMojoExecutionConfigurationLog(settingsForThisRun);
@@ -527,7 +520,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
         }
     }
 
-    private void scanForMainClassInsideJarFile(boolean hasCustomMainClass, Path targetAppArtifact) throws MojoExecutionException {
+    private void scanForMainClassInsideJarFile(Path targetAppArtifact) throws MojoExecutionException {
+        boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
         // scan for main-class
         if( hasCustomMainClass && scanForMainClass ){
             if( verbose ){
@@ -666,7 +660,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
         }
     }
 
-    private void copyDependenciesToLibFolder(Set<String> copiedDependencies) throws MojoFailureException, MojoExecutionException {
+    private Set<String> copyDependenciesToLibFolder() throws MojoFailureException, MojoExecutionException {
+        Set<String> copiedDependencies = new LinkedHashSet<>();
         if( copyDependencies ){
             if( verbose ){
                 getLog().info("Copying registered dependencies...");
@@ -736,9 +731,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 outputLibFolder.delete();
             }
         }
+        return copiedDependencies;
     }
 
-    private void writeMainClassToManifest(boolean hasCustomMainClass, Properties settingsForThisRun, Path targetAppArtifact) throws MojoExecutionException, MojoFailureException {
+    private void writeMainClassToManifest(Properties settingsForThisRun, Path targetAppArtifact) throws MojoExecutionException, MojoFailureException {
+        boolean hasCustomMainClass = mainClass != null && !mainClass.trim().isEmpty();
         if( hasCustomMainClass ){
             settingsForThisRun.put("mainClass", mainClass);
             if( verbose ){
@@ -829,7 +826,8 @@ public class CreateJavaAppBundle extends AbstractMojo {
         }
     }
 
-    private void findArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoFailureException {
+    private AtomicReference<File> findArtifactToWorkOn() throws MojoFailureException {
+        AtomicReference<File> sourceToCopy = new AtomicReference<>();
         if( verbose ){
             getLog().info("Finding artifact to work on...");
         }
@@ -857,6 +855,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 throw new MojoFailureException(String.format("There was no artifact with qualifier %s to work on. Please check your build-log or reconfigure", sourceClassifier));
             }
         }
+        return sourceToCopy;
     }
 
     private void prepareTargetArea() throws MojoFailureException {
