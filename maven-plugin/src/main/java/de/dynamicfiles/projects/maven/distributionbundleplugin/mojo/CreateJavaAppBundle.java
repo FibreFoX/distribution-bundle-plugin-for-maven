@@ -276,17 +276,24 @@ public class CreateJavaAppBundle extends AbstractMojo {
         Properties settingsForThisRun = new Properties();
 
         // method-calls to each part of bundling
-        prepareTargetArea();
-        AtomicReference<File> sourceToCopy = findArtifactToWorkOn();
-        Path targetAppArtifact = copyArtifactToWorkOn(sourceToCopy);
-        maintainMainClassInManifest(settingsForThisRun, targetAppArtifact);
-        Set<String> copiedDependencies = copyDependenciesToLibFolder();
-        copyAdditionalApplicationResources();
-        adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
-        scanForMainClassInsideJarFile(targetAppArtifact);
-        signJarFiles(targetAppArtifact);
-        createPackedBundleAndAttachToProject();
-        writeMojoExecutionConfigurationLog(settingsForThisRun);
+        try{
+            prepareTargetArea();
+            AtomicReference<File> sourceToCopy = findArtifactToWorkOn();
+            Path targetAppArtifact = copyArtifactToWorkOn(sourceToCopy);
+            maintainMainClassInManifest(settingsForThisRun, targetAppArtifact);
+            Set<String> copiedDependencies = copyDependenciesToLibFolder();
+            copyAdditionalApplicationResources();
+            adjustClasspathInsideJarFile(copiedDependencies, settingsForThisRun, targetAppArtifact);
+            scanForMainClassInsideJarFile(targetAppArtifact);
+            signJarFiles(targetAppArtifact);
+            createPackedBundleAndAttachToProject();
+            writeMojoExecutionConfigurationLog(settingsForThisRun);
+        } catch(MojoExecutionException | MojoFailureException ex){
+            // try to write execution configuration log, even when other parts did fail
+            // this makes sure that file was created for bug-reporting
+            writeMojoExecutionConfigurationLog(settingsForThisRun);
+            throw ex;
+        }
     }
 
     private Path copyArtifactToWorkOn(AtomicReference<File> sourceToCopy) throws MojoExecutionException {
