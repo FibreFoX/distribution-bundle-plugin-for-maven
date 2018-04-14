@@ -20,7 +20,7 @@ install:
 build_script:
   - cmd: mvn clean package --batch-mode -DskipTest
 test_script:
-  - cmd: mvn clean package --batch-mode
+  - cmd: mvn clean install --batch-mode
 
 environment:
   matrix:
