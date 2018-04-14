@@ -258,6 +258,11 @@ public class CreateJavaAppBundle extends AbstractMojo {
     @Parameter(defaultValue = "java-app-bundle")
     private String targetClassifier;
 
+    /**
+     * To keep track on every created java-app bundle, this temporary file is created. This is a workaround for
+     * not knowing how I can share that information across multiple executions within maven. Pull-Requests are
+     * welcome on this, as it feels ugly...
+     */
     @Parameter(defaultValue = "${project.build.directory}/distbundle.java-app-executions.tmp", readonly = true)
     private File mojoExecutionTrackingFile;
 
@@ -301,25 +306,49 @@ public class CreateJavaAppBundle extends AbstractMojo {
         return targetAppArtifact;
     }
 
-    private void createPackedBundleAndAttachToProject() throws MojoExecutionException {
+    private void createPackedBundleAndAttachToProject() throws MojoExecutionException, MojoFailureException {
         if( createPackedBundle ){
             if( verbose ){
                 getLog().info("Creating packed bundle (ZIP-file)...");
             }
-            // TODO check if for given classifier was already created in a prior execution
+            // check if for given classifier was already created in a previous execution, prior of packing it (reduces time to failure)
 
+            // prepare java-app bundle executions tracking file
             if( !mojoExecutionTrackingFile.exists() ){
                 try{
                     mojoExecutionTrackingFile.createNewFile();
+                    // when maven ends, the JVM ends too (despite of the way how gradle is working)
+                    // the created file is only relevant for each run, so delete it after JVM died
+                    mojoExecutionTrackingFile.deleteOnExit();
                 } catch(IOException ex){
-                    Logger.getLogger(CreateJavaAppBundle.class.getName()).log(Level.SEVERE, null, ex);
+                    // NO-OP if everything went okay until this point, is it really worth to fail the build for this?!?
                 }
             }
 
             if( targetClassifier == null || targetClassifier.trim().isEmpty() ){
-                getLog().warn("Provided bundle artifact classifier was invalid, using default one...");
+                getLog().warn("Provided target bundle artifact classifier was invalid, using default one...");
                 // fix this wrong configuration (do not fail, as we already got this far)
                 targetClassifier = "java-app-bundle";
+            }
+
+            // check if java-app bundle executions tracking file contains this target classifier
+            try{
+                List<String> allPreviousExecutions = Files.readAllLines(mojoExecutionTrackingFile.toPath());
+                Set<String> uniquePreviousExecutions = allPreviousExecutions
+                        .stream()
+                        .map(classifier -> classifier.trim())
+                        .map(classifier -> classifier.replaceAll("(\r\n)|(\r)|(\n)", ""))
+                        .collect(Collectors.toSet());
+                if( uniquePreviousExecutions.contains(targetClassifier) ){
+                    throw new MojoFailureException(String.format("Artifact for classifier '%s' was already attached to project. Please review your plugin-configuration.", targetClassifier));
+                }
+                // add to list and write to file
+                uniquePreviousExecutions.add(targetClassifier);
+                Files.write(mojoExecutionTrackingFile.toPath(), uniquePreviousExecutions, StandardOpenOption.APPEND);
+            } catch(IOException ex){
+                throw new MojoFailureException(null, ex);
+            } catch(MojoFailureException ex){
+                throw ex;
             }
 
             // add to project artifacts, zipped
