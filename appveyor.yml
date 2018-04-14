@@ -18,14 +18,15 @@ install:
       }
       $env:Path +=";C:\maven\apache-maven-3.5.2\bin;%JAVA_HOME%\bin"
 build_script:
-  - mvn clean package --batch-mode -DskipTest
+  - cmd: mvn clean package --batch-mode -DskipTest
 test_script:
-  - mvn clean package --batch-mode
+  - cmd: mvn clean package --batch-mode
 
 environment:
   matrix:
   - JAVA_HOME: C:\Program Files\Java\jdk1.8.0
   - JAVA_HOME: C:\Program Files (x86)\Java\jdk1.8.0
+  - JAVA_HOME: C:\Program Files\Java\jdk9
 
 matrix:
   fast_finish: true
