@@ -49,8 +49,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.apache.maven.plugin.AbstractMojo;
@@ -377,7 +375,6 @@ public class CreateJavaAppBundle extends AbstractMojo {
             getLog().info("Writing mojo execution configuration log...");
         }
 
-        // TODO write property-file even when having some exception (for debugging-purpose)
         // write property-file which contains the whole configuration used for this mojo-execution
         // here is why:
         // * for debugging-purpose when opening a bug-ticket/issue at github
