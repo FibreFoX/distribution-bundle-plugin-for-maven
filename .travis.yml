@@ -58,5 +58,8 @@ matrix:
       osx_image: xcode9.2
       env: FAILURES_ALLOWED=false
 
+script:
+  - mvn install -B
+
 notifications:
   email: false
