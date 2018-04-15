@@ -78,10 +78,10 @@ public class CreateNativeAppBundle extends AbstractMojo {
      * Source folder to pick up the application. It's not required that this application has to be created by this
      * plugin, but expects a special file/folder layout.
      */
-    @Parameter(defaultValue = "${project.build.directory}/bundles/java-app", property = "distbundle.nativeapp.sourceFolder")
+    @Parameter(defaultValue = "${project.build.directory}/distbundle/java-app", property = "distbundle.nativeapp.sourceFolder")
     private File sourceFolder;
 
-    @Parameter(defaultValue = "${project.build.directory}/bundles/native-app", property = "distbundle.nativeapp.outputBaseFolder")
+    @Parameter(defaultValue = "${project.build.directory}/distbundle/native-app", property = "distbundle.nativeapp.outputBaseFolder")
     private File outputBaseFolder;
 
     /**
