@@ -220,7 +220,7 @@ public class InternalUtils implements SharedInternalTools {
                 // make it positive in case of huge offset-gap 
                 foundOffset = foundOffset >= 0 ? foundOffset : 0x10000 + foundOffset;
                 // TODO put into log on verbose
-                System.out.println("Found PE-Header offset: " + foundOffset);
+//                System.out.println("Found PE-Header offset: " + foundOffset);
 
                 if( foundOffset > 0 ){
                     // found PE header offset, reading the next 6 bytes should be enough to verify
