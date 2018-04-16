@@ -19,15 +19,17 @@ import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLaunche
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.spi.NativeAppBundler;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -185,8 +187,6 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             }
 
             // check if configuration was provided as normal string
-            System.out.println("configuration > '" + nativeLauncher.getConfiguration() + "'");
-
             AtomicReference<String> configurationContent = new AtomicReference<>();
 
             // first we check configuration file template being set
@@ -212,21 +212,32 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             // when no configuration file template was set, check "configuration" parameter
             // TODO find better namen for "configuration" xD
             if( configurationContent.get() == null ){
-                System.out.println(String.format("Using inline configuration for launcher: '%s'", nativeLauncher.getFilename()));
                 String xmlConfiguration = nativeLauncher.getConfiguration();
-                // sanitize ugly line-spacings when being specified via xml
-                String[] xmlConfigurationLines = xmlConfiguration.split("(\r\n)|(\r)|(\n)");
-                List<String> sanitizedLines = Arrays.asList(xmlConfigurationLines)
-                        .stream()
-                        .map(line -> line.trim())
-                        .collect(Collectors.toList());
-                configurationContent.set(String.join("\n", sanitizedLines));
-            }
 
-            // if configuration template still is empty, use internal default one
-            if( configurationContent.get() == null ){
-                System.out.println(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
-                // TODO implement
+                // if configuration template still is empty, use internal default one
+                if( xmlConfiguration == null ){
+                    System.out.println(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    // TODO implement cfg-format too
+                    StringBuilder sb = new StringBuilder();
+                    try(InputStream resourceAsStream = this.getClass().getResourceAsStream("configurationTemplate.ini")){
+                        try(BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream))){
+                            reader.lines().forEachOrdered(line -> sb.append(line).append("\n"));
+                        }
+                    } catch(IOException ioex){
+                        configurationCreationException.set(new MojoExecutionException("Could not read from default configuration file.", ioex));
+                        return;
+                    }
+                    configurationContent.set(sb.toString());
+                } else {
+                    System.out.println(String.format("Using inline configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    // sanitize ugly line-spacings when being specified via xml
+                    String[] xmlConfigurationLines = xmlConfiguration.split("(\r\n)|(\r)|(\n)");
+                    List<String> sanitizedLines = Arrays.asList(xmlConfigurationLines)
+                            .stream()
+                            .map(line -> line.trim())
+                            .collect(Collectors.toList());
+                    configurationContent.set(String.join("\n", sanitizedLines));
+                }
             }
 
             System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
