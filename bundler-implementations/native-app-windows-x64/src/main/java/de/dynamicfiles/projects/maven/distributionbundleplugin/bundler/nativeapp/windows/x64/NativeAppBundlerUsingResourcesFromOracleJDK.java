@@ -34,6 +34,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -52,7 +53,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
     private final String jmodWithLauncherBinaries = "jdk.packager.jmod";
 
     @Override
-    public File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException {
+    public File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers, Map<String, String> internalParameters) throws MojoFailureException, MojoExecutionException {
         // as since JDK 9 the resource-files are inside a jmod-file (non opened), as a workaround I'm using
         // the "jmod"-binary to extract the whole "jdk.packager.jmod"-file temporary
         // "native binaries" (bootstrapping launchers) are expecting the application sitting inside some "app"-folder aside of the native launcher
@@ -256,7 +257,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
     }
 
     @Override
-    public boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath) {
+    public boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath, Map<String, String> internalParameters) {
         Path javaBinary = new File(jrePath).toPath().resolve("bin").resolve("java.exe");
         boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(javaBinary);
         return bitCheckOfLauncherMatching == true;

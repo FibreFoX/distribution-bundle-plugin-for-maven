@@ -20,6 +20,7 @@ import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
@@ -44,12 +45,13 @@ public interface NativeAppBundler {
      * @param internalUtils
      * @param jdkPath       for checking and required resources or executables, has to be provided JDK
      * @param jrePath       when bundling with included JRE, it might be specified having a different cpu architecture
+     * @param internalParameters
      *
      * @return
      */
-    boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath);
+    boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath, Map<String, String> internalParameters);
 
-    File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException;
+    File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers, Map<String, String> internalParameters) throws MojoFailureException, MojoExecutionException;
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.

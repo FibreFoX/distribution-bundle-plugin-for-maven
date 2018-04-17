@@ -225,6 +225,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
                 jrePath = System.getProperty("java.home");
             }
         }
+        // TODO handle user not wanting the JRE
         File jre = new File(jrePath);
         if( !jre.exists() ){
             throw new MojoFailureException("Could not find JRE at location: " + jre.getAbsolutePath());
@@ -445,14 +446,14 @@ public class CreateNativeAppBundle extends AbstractMojo {
                     getLog().info("Running bundler requirements checks...");
                 }
 
-                appBundler.checkRequirements(internalUtils, jdkPath, jrePath);
+                appBundler.checkRequirements(internalUtils, jdkPath, jrePath, internalParameters);
 
                 if( verbose ){
                     getLog().info("Running creation of native app bundle...");
                 }
 
                 // here we have a "valid" bundler, so call it
-                File bundlerOutput = appBundler.bundleApp(jdkPath, jrePath, internalUtils, outputBaseFolder, sourceFolder, tempWorkfolder, project, nativeLaunchers);
+                File bundlerOutput = appBundler.bundleApp(jdkPath, jrePath, internalUtils, outputBaseFolder, sourceFolder, tempWorkfolder, project, nativeLaunchers, internalParameters);
             } catch(MojoFailureException | MojoExecutionException ex){
                 // pass exception to outer world
                 innerException.set(ex);
