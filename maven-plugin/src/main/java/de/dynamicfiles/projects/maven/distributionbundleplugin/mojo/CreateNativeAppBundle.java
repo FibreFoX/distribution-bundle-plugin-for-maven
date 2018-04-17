@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -100,6 +102,14 @@ public class CreateNativeAppBundle extends AbstractMojo {
      */
     @Parameter(defaultValue = "${java.home}")
     private String jdkPath;
+
+    /**
+     * To bundle your application with the JRE, you have to set this parameter. When having JDK9+ the location can
+     * be set to "${java.home}/../jre-${java.version}", on JDK8 the JRE inside the JDK will get used (like the javapackager
+     * and the javafx-maven-plugin before).
+     */
+    @Parameter
+    private String jrePath;
 
     /**
      * In case you want to have multiple native launchers, please create them here, each with a different
@@ -191,6 +201,33 @@ public class CreateNativeAppBundle extends AbstractMojo {
 
         if( !tempWorkfolder.exists() && !tempWorkfolder.mkdirs() ){
             throw new MojoFailureException("Not possible to create temporary working folder: " + tempWorkfolder.getAbsolutePath());
+        }
+
+        if( jrePath == null || jrePath.trim().isEmpty() ){
+            if( verbose ){
+                getLog().info("JRE was not set, trying to autodetect...");
+            }
+            // detect jmods-folder in order to detect jdk9+
+            boolean isUsingJmodFiles = Files.exists(new File(jdkPath).toPath().resolve("jmods"), LinkOption.NOFOLLOW_LINKS);
+            if( isUsingJmodFiles ){
+                if( verbose ){
+                    getLog().info("Found JDK9+ layout.");
+                }
+                // JDK9+
+                jrePath = System.getProperty("java.home") + "/../jre-" + System.getProperty("java.version");
+            } else {
+                if( verbose ){
+                    getLog().info("Found JDK8 layout.");
+                }
+                // JDK8
+                // please be aware that java.home does NOT equal to JAVA_HOME, this is an often
+                // misinterpreted system-property, it points to the JRE inside the JDK
+                jrePath = System.getProperty("java.home");
+            }
+        }
+        File jre = new File(jrePath);
+        if( !jre.exists() ){
+            throw new MojoFailureException("Could not find JRE at location: " + jre.getAbsolutePath());
         }
 
         if( verbose ){
