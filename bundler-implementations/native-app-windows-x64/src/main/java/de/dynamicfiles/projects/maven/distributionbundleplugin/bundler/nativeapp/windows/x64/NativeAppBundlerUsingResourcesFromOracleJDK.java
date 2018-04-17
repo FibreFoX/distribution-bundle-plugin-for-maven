@@ -52,7 +52,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
     private final String jmodWithLauncherBinaries = "jdk.packager.jmod";
 
     @Override
-    public File bundleApp(String jdkPath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException {
+    public File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException {
         // as since JDK 9 the resource-files are inside a jmod-file (non opened), as a workaround I'm using
         // the "jmod"-binary to extract the whole "jdk.packager.jmod"-file temporary
         // "native binaries" (bootstrapping launchers) are expecting the application sitting inside some "app"-folder aside of the native launcher
@@ -85,7 +85,8 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
             ProcessBuilder extractionProcess = new ProcessBuilder()
                     .inheritIO()
-                    .directory(project.getBasedir())
+                    // use the jmod-command from the provided JDK-path (might be a different version, where something has changed
+                    .directory(new File(jdkPath))
                     .command(command);
             try{
                 Process p = extractionProcess.start();
@@ -242,12 +243,23 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
             System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
         });
+
+        // TODO copy JRE/runtime
+        Path runtimeTargetFolder = outputBaseFolder.toPath().resolve("windows-x64").resolve("runtime");
+        try{
+            Files.createDirectories(runtimeTargetFolder);
+            internalUtils.copyRecursive(new File(jrePath).toPath(), runtimeTargetFolder);
+        } catch(IOException ex){
+            Logger.getLogger(NativeAppBundlerUsingResourcesFromOracleJDK.class.getName()).log(Level.SEVERE, null, ex);
+        }
         return null;
     }
 
     @Override
-    public boolean checkRequirements(String jdkPath) {
-        return true;
+    public boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath) {
+        Path javaBinary = new File(jrePath).toPath().resolve("bin").resolve("java.exe");
+        boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(javaBinary);
+        return bitCheckOfLauncherMatching == true;
     }
 
     @Override
@@ -261,7 +273,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
     }
 
     @Override
-    public OS getClientOS() {
+    public OS getDistributionTargetOS() {
         return OS.WINDOWS;
     }
 

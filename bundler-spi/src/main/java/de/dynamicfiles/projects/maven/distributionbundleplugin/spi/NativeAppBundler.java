@@ -41,13 +41,15 @@ public interface NativeAppBundler {
      * Bundlers might depend on locally installed tooling, therefor checking their existence or all requirements being fulfilled
      * can be done by this method.
      *
-     * @param jdkPath for checking and required resources or executables, has to be provided JDK
+     * @param internalUtils
+     * @param jdkPath       for checking and required resources or executables, has to be provided JDK
+     * @param jrePath       when bundling with included JRE, it might be specified having a different cpu architecture
      *
      * @return
      */
-    boolean checkRequirements(String jdkPath);
+    boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath);
 
-    File bundleApp(String jdkPath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException;
+    File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers) throws MojoFailureException, MojoExecutionException;
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.
@@ -64,5 +66,5 @@ public interface NativeAppBundler {
      */
     boolean creatableOnBuildsystem(OS os);
 
-    OS getClientOS();
+    OS getDistributionTargetOS();
 }
