@@ -229,7 +229,7 @@ public class InternalUtils implements SharedInternalTools {
                     peHeader.order(ByteOrder.LITTLE_ENDIAN);
                     if( peHeader.get(0) == 'P' && peHeader.get(1) == 'E' && peHeader.get(2) == '\0' && peHeader.get(3) == '\0' ){
                         // TODO put into log on verbose
-                        // found legal PE header, now reading architecture
+                        // found legal PE header, now reading architecture (first bytes from COFF header)
                         short architectureShort = peHeader.getShort(4);
                         // https://stackoverflow.com/a/7932774/1961102
                         int architectureAsInt = architectureShort >= 0 ? architectureShort : 0x10000 + architectureShort;
