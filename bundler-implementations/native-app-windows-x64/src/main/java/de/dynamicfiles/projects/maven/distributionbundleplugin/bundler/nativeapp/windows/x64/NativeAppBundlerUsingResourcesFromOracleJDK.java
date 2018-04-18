@@ -15,7 +15,7 @@
  */
 package de.dynamicfiles.projects.maven.distributionbundleplugin.bundler.nativeapp.windows.x64;
 
-import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLauncher;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeAppOptions;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.spi.NativeAppBundler;
@@ -34,15 +34,16 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.repository.RepositorySystem;
 
 /**
  *
@@ -53,27 +54,27 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
     private final String jmodWithLauncherBinaries = "jdk.packager.jmod";
 
     @Override
-    public File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers, Map<String, String> internalParameters) throws MojoFailureException, MojoExecutionException {
+    public File bundleApp(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log logger) throws MojoFailureException, MojoExecutionException {
         // as since JDK 9 the resource-files are inside a jmod-file (non opened), as a workaround I'm using
         // the "jmod"-binary to extract the whole "jdk.packager.jmod"-file temporary
         // "native binaries" (bootstrapping launchers) are expecting the application sitting inside some "app"-folder aside of the native launcher
         // .\jmod.exe extract --dir C:\Users\FibreFoX\Desktop\blub ..\jmods\jdk.packager.jmod
-        File outputFolderForJavaApp = outputBaseFolder.toPath().resolve("windows-x64").resolve("app").toFile();
+        File outputFolderForJavaApp = nativeAppOptions.getOutputBaseFolder().toPath().resolve("windows-x64").resolve("app").toFile();
         if( !outputFolderForJavaApp.exists() && !outputFolderForJavaApp.mkdirs() ){
             throw new MojoFailureException("Not possible to create output folder: " + outputFolderForJavaApp.getAbsolutePath());
         }
 
         // copy source bundle to nested app-folder (requirement of the native launcher from the jdk-executable)
         try{
-            internalUtils.copyRecursive(sourceFolder.toPath(), outputFolderForJavaApp.toPath());
+            internalUtils.copyRecursive(nativeAppOptions.getSourceFolder().toPath(), outputFolderForJavaApp.toPath());
         } catch(IOException ex){
             throw new MojoFailureException(null, ex);
         }
 
-        boolean isUsingJmodFiles = Files.exists(new File(jdkPath).toPath().resolve("jmods"), LinkOption.NOFOLLOW_LINKS);
+        boolean isUsingJmodFiles = Files.exists(new File(nativeAppOptions.getJdkPath()).toPath().resolve("jmods"), LinkOption.NOFOLLOW_LINKS);
         if( isUsingJmodFiles ){
             // check if required jmod file is existing
-            if( !new File(jdkPath).toPath().resolve("jmods").resolve(jmodWithLauncherBinaries).toFile().exists() ){
+            if( !new File(nativeAppOptions.getJdkPath()).toPath().resolve("jmods").resolve(jmodWithLauncherBinaries).toFile().exists() ){
                 throw new MojoExecutionException("Missing JMOD-file: " + jmodWithLauncherBinaries);
             }
 
@@ -81,13 +82,17 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             command.add("jmod");
             command.add("extract");
             command.add("--dir");
-            command.add(tempWorkfolder.getAbsolutePath());
-            command.add(jdkPath + File.separator + "jmods" + File.separator + jmodWithLauncherBinaries);
+            command.add(nativeAppOptions.getTempWorkfolder().getAbsolutePath());
+            command.add(nativeAppOptions.getJdkPath() + File.separator + "jmods" + File.separator + jmodWithLauncherBinaries);
+
+            if( nativeAppOptions.isVerbose() ){
+                logger.info("Executing command: " + String.join(" ", command));
+            }
 
             ProcessBuilder extractionProcess = new ProcessBuilder()
                     .inheritIO()
                     // use the jmod-command from the provided JDK-path (might be a different version, where something has changed
-                    .directory(new File(jdkPath))
+                    .directory(new File(nativeAppOptions.getJdkPath()))
                     .command(command);
             try{
                 Process p = extractionProcess.start();
@@ -98,12 +103,12 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             } catch(IOException | InterruptedException ex){
                 throw new MojoExecutionException(null, ex);
             }
-            Path windowsBinariesSource = tempWorkfolder.toPath().resolve("classes").resolve("com").resolve("oracle").resolve("tools").resolve("packager").resolve("windows");
+            Path windowsBinariesSource = nativeAppOptions.getTempWorkfolder().toPath().resolve("classes").resolve("com").resolve("oracle").resolve("tools").resolve("packager").resolve("windows");
 
             // copy all DLL-files
             try{
-                Path targetFolder = outputBaseFolder.toPath().resolve("windows-x64");
-                // TODO refactor this into utils-method
+                Path targetFolder = nativeAppOptions.getOutputBaseFolder().toPath().resolve("windows-x64");
+                // TODO refactor this into utils-method for single-level-copy
                 Files.walkFileTree(windowsBinariesSource, new FileVisitor<Path>() {
 
                     boolean enteredFolder = false;
@@ -139,7 +144,9 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                     }
                 });
             } catch(IOException ex){
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                if( nativeAppOptions.isVerbose() ){
+                    logger.error(null, ex);
+                }
             }
 
             // copy launcher files
@@ -152,7 +159,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                 throw new MojoExecutionException("Provided JDK did not contain correct bit architecture, please provide some 64bit JDK");
             }
 
-            nativeLaunchers.forEach(nativeLauncher -> {
+            nativeAppOptions.getNativeLaunchers().forEach(nativeLauncher -> {
                 try{
                     String fileExtension = nativeLauncher.getExtension();
                     if( fileExtension == null || fileExtension.trim().isEmpty() ){
@@ -160,16 +167,18 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                             fileExtension = "exe";
                         }
                     }
-                    Files.copy(windowsLauncherBinary, outputBaseFolder.toPath().resolve("windows-x64").resolve(nativeLauncher.getFilename() + "." + fileExtension), StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(windowsLauncherBinary, nativeAppOptions.getOutputBaseFolder().toPath().resolve("windows-x64").resolve(nativeLauncher.getFilename() + "." + fileExtension), StandardCopyOption.REPLACE_EXISTING);
                 } catch(IOException ex){
-                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                    if( nativeAppOptions.isVerbose() ){
+                        logger.info(null, ex);
+                    }
                 }
             });
         } else {
             // assume we are using JDK prior JDK 9 (8,7,...)
             // on JDK prior JDK 9, java.home points to the JRE inside the JDK
-            Path antJfxJar = new File(jdkPath).toPath().resolve("lib").resolve("ant-javafx.jar");
-            Path antJfxJarinParentFolder = new File(jdkPath).toPath().getParent().resolve("lib").resolve("ant-javafx.jar");
+            Path antJfxJar = new File(nativeAppOptions.getJdkPath()).toPath().resolve("lib").resolve("ant-javafx.jar");
+            Path antJfxJarinParentFolder = new File(nativeAppOptions.getJdkPath()).toPath().getParent().resolve("lib").resolve("ant-javafx.jar");
 //            System.out.println("Checking: " + antJfxJar.toFile().getAbsolutePath());
 //            System.out.println("Checking: " + antJfxJarinParentFolder.toFile().getAbsolutePath());
             if( !antJfxJar.toFile().exists() && !antJfxJarinParentFolder.toFile().exists() ){
@@ -183,7 +192,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
         AtomicReference<MojoExecutionException> configurationCreationException = new AtomicReference<>();
 
         // TODO create launcher cfg-files
-        nativeLaunchers.forEach(nativeLauncher -> {
+        nativeAppOptions.getNativeLaunchers().forEach(nativeLauncher -> {
             if( configurationCreationException.get() != null ){
                 return;
             }
@@ -195,7 +204,9 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             AtomicReference<IOException> configurationSourceFileException = new AtomicReference<>();
             File configurationSourceFile = nativeLauncher.getConfigurationFile();
             Optional.ofNullable(nativeLauncher.getConfigurationFile()).ifPresent(configFileTemplate -> {
-                System.out.println(String.format("Reading configuration file for launcher: '%s'", nativeLauncher.getFilename()));
+                if( nativeAppOptions.isVerbose() ){
+                    logger.info(String.format("Reading configuration file for launcher: '%s'", nativeLauncher.getFilename()));
+                }
                 try{
                     if( !Files.exists(configFileTemplate.toPath(), LinkOption.NOFOLLOW_LINKS) ){
                         throw new IOException("Configuration file not found at: " + configFileTemplate.getAbsolutePath());
@@ -218,7 +229,9 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
                 // if configuration template still is empty, use internal default one
                 if( xmlConfiguration == null ){
-                    System.out.println(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    if( nativeAppOptions.isVerbose() ){
+                        logger.info(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    }
                     // TODO implement cfg-format too
                     StringBuilder sb = new StringBuilder();
                     try(InputStream resourceAsStream = this.getClass().getResourceAsStream("configurationTemplate.ini")){
@@ -231,7 +244,9 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                     }
                     configurationContent.set(sb.toString());
                 } else {
-                    System.out.println(String.format("Using inline configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    if( nativeAppOptions.isVerbose() ){
+                        logger.info(String.format("Using inline configuration for launcher: '%s'", nativeLauncher.getFilename()));
+                    }
                     // sanitize ugly line-spacings when being specified via xml
                     String[] xmlConfigurationLines = xmlConfiguration.split("(\r\n)|(\r)|(\n)");
                     List<String> sanitizedLines = Arrays.asList(xmlConfigurationLines)
@@ -242,25 +257,36 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                 }
             }
 
-            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
+//            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
         });
 
-        // TODO copy JRE/runtime
-        Path runtimeTargetFolder = outputBaseFolder.toPath().resolve("windows-x64").resolve("runtime");
-        try{
-            Files.createDirectories(runtimeTargetFolder);
-            internalUtils.copyRecursive(new File(jrePath).toPath(), runtimeTargetFolder);
-        } catch(IOException ex){
-            Logger.getLogger(NativeAppBundlerUsingResourcesFromOracleJDK.class.getName()).log(Level.SEVERE, null, ex);
+        // copy JRE/runtime
+        if( nativeAppOptions.isWithJRE() ){
+            if( nativeAppOptions.isVerbose() ){
+                logger.info("Copying JRE...");
+            }
+            Path runtimeTargetFolder = nativeAppOptions.getOutputBaseFolder().toPath().resolve("windows-x64").resolve("runtime");
+            try{
+                Files.createDirectories(runtimeTargetFolder);
+                internalUtils.copyRecursive(new File(nativeAppOptions.getJrePath()).toPath(), runtimeTargetFolder);
+            } catch(IOException ex){
+                if( nativeAppOptions.isVerbose() ){
+                    logger.error(null, ex);
+                }
+            }
         }
         return null;
     }
 
     @Override
-    public boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath, Map<String, String> internalParameters) {
-        Path javaBinary = new File(jrePath).toPath().resolve("bin").resolve("java.exe");
+    public boolean checkRequirements(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log logger) {
+        Path javaBinary = new File(nativeAppOptions.getJrePath()).toPath().resolve("bin").resolve("java.exe");
         boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(javaBinary);
-        return bitCheckOfLauncherMatching == true;
+        if( !bitCheckOfLauncherMatching ){
+            logger.error("Provided JRE does not match expected bit architecture. Detected 32bit JRE instead of 64bit.");
+            return false;
+        }
+        return true;
     }
 
     @Override

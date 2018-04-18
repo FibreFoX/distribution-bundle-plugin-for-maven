@@ -16,6 +16,7 @@
 package de.dynamicfiles.projects.maven.distributionbundleplugin.mojo;
 
 import de.dynamicfiles.projects.maven.distributionbundleplugin.InternalUtils;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeAppOptions;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLauncher;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.spi.NativeAppBundler;
 import java.io.File;
@@ -103,6 +104,9 @@ public class CreateNativeAppBundle extends AbstractMojo {
     @Parameter(defaultValue = "${java.home}")
     private String jdkPath;
 
+    /**
+     * If you want no JRE being bundled with your application, just set this parameter to "false".
+     */
     @Parameter(defaultValue = "true")
     private boolean withJRE;
 
@@ -450,14 +454,26 @@ public class CreateNativeAppBundle extends AbstractMojo {
                     getLog().info("Running bundler requirements checks...");
                 }
 
-                appBundler.checkRequirements(internalUtils, jdkPath, jrePath, internalParameters);
+                NativeAppOptions nativeAppOptions = new NativeAppOptions();
+
+                nativeAppOptions.setInternalParameters(internalParameters);
+                nativeAppOptions.setJdkPath(jdkPath);
+                nativeAppOptions.setJrePath(jrePath);
+                nativeAppOptions.setNativeLaunchers(nativeLaunchers);
+                nativeAppOptions.setOutputBaseFolder(outputBaseFolder);
+                nativeAppOptions.setSourceFolder(sourceFolder);
+                nativeAppOptions.setTempWorkfolder(tempWorkfolder);
+                nativeAppOptions.setVerbose(verbose);
+                nativeAppOptions.setWithJRE(withJRE);
+
+                appBundler.checkRequirements(nativeAppOptions, internalUtils, project, repositorySystem, mojoExecution, session, getLog());
 
                 if( verbose ){
                     getLog().info("Running creation of native app bundle...");
                 }
 
                 // here we have a "valid" bundler, so call it
-                File bundlerOutput = appBundler.bundleApp(jdkPath, jrePath, internalUtils, outputBaseFolder, sourceFolder, tempWorkfolder, project, nativeLaunchers, internalParameters);
+                File bundlerOutput = appBundler.bundleApp(nativeAppOptions, internalUtils, project, repositorySystem, mojoExecution, session, getLog());
             } catch(MojoFailureException | MojoExecutionException ex){
                 // pass exception to outer world
                 innerException.set(ex);

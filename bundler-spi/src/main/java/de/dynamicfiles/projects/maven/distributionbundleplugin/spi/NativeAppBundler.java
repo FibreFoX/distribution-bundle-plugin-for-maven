@@ -15,15 +15,17 @@
  */
 package de.dynamicfiles.projects.maven.distributionbundleplugin.spi;
 
-import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeLauncher;
+import de.dynamicfiles.projects.maven.distributionbundleplugin.api.NativeAppOptions;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.OS;
 import de.dynamicfiles.projects.maven.distributionbundleplugin.api.SharedInternalTools;
 import java.io.File;
-import java.util.List;
-import java.util.Map;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.repository.RepositorySystem;
 
 /**
  *
@@ -42,16 +44,18 @@ public interface NativeAppBundler {
      * Bundlers might depend on locally installed tooling, therefor checking their existence or all requirements being fulfilled
      * can be done by this method.
      *
+     * @param nativeAppOptions
      * @param internalUtils
-     * @param jdkPath       for checking and required resources or executables, has to be provided JDK
-     * @param jrePath       when bundling with included JRE, it might be specified having a different cpu architecture
-     * @param internalParameters
+     * @param project
+     * @param repositorySystem
+     * @param mojoExecution
+     * @param session
      *
      * @return
      */
-    boolean checkRequirements(SharedInternalTools internalUtils, String jdkPath, String jrePath, Map<String, String> internalParameters);
+    boolean checkRequirements(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log log);
 
-    File bundleApp(String jdkPath, String jrePath, SharedInternalTools internalUtils, File outputBaseFolder, File sourceFolder, File tempWorkfolder, MavenProject project, List<NativeLauncher> nativeLaunchers, Map<String, String> internalParameters) throws MojoFailureException, MojoExecutionException;
+    File bundleApp(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log log) throws MojoFailureException, MojoExecutionException;
 
     /**
      * As there is no direct help via maven, this bundler can be enhanced for showing the used additional parameters.
