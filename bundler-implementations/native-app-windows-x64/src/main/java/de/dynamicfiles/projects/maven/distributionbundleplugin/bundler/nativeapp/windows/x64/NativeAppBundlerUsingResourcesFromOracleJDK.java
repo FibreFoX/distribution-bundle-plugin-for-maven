@@ -30,11 +30,14 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.maven.execution.MavenSession;
@@ -191,6 +194,68 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
         AtomicReference<MojoExecutionException> configurationCreationException = new AtomicReference<>();
 
+        // TODO check for previous java-app executions for required parameter
+        List<Path> javaAppExecutions = new ArrayList<>();
+        File mavenTargetFolder = new File(project.getBuild().getDirectory());
+        try{
+            Files.walkFileTree(mavenTargetFolder.toPath(), new FileVisitor<Path>() {
+
+                boolean enteredFolder = false;
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path subfolder, BasicFileAttributes attrs) throws IOException {
+                    if( enteredFolder ){
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    enteredFolder = true;
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path sourceFile, BasicFileAttributes attrs) throws IOException {
+                    // do copy, and replace, as the resource might already be existing
+                    if( sourceFile.toFile().getName().startsWith("distbundle.java-app-execution.") ){
+                        javaAppExecutions.add(sourceFile.toAbsolutePath());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path source, IOException ioe) throws IOException {
+                    // fail fast
+                    return FileVisitResult.TERMINATE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path source, IOException ioe) throws IOException {
+                    // nothing to do here
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch(IOException ioex){
+            throw new MojoExecutionException(null, ioex);
+        }
+        if( javaAppExecutions.isEmpty() ){
+            // TODO check inside internal parameters, as there are no executions
+            Map<String, String> internalParameters = Optional.ofNullable(nativeAppOptions.getInternalParameters()).orElseThrow(() -> {
+                return new MojoFailureException("Could not read from <internalParameters>, because it was empty. Please review your plugin-configuration");
+            });
+        } else {
+            if( javaAppExecutions.size() == 1 ){
+                // TODO get all required information from that single properties-file
+                try(InputStream execution = Files.newInputStream(javaAppExecutions.get(0))){
+                    new Properties().load(execution);
+                } catch(IOException ioex){
+
+                }
+            } else {
+                // TODO check inside internal parameters for execution-id marker, as there are too many executions
+                Map<String, String> internalParameters = Optional.ofNullable(nativeAppOptions.getInternalParameters()).orElseThrow(() -> {
+                    return new MojoFailureException("Could not read from <internalParameters>, because it was empty. Please review your plugin-configuration");
+                });
+            }
+        }
+
         // TODO create launcher cfg-files
         nativeAppOptions.getNativeLaunchers().forEach(nativeLauncher -> {
             if( configurationCreationException.get() != null ){
@@ -232,7 +297,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                     if( nativeAppOptions.isVerbose() ){
                         logger.info(String.format("Using default configuration for launcher: '%s'", nativeLauncher.getFilename()));
                     }
-                    // TODO implement cfg-format too
+                    // TODO implement cfg-format too (only if older java-version does not support INI)
                     StringBuilder sb = new StringBuilder();
                     try(InputStream resourceAsStream = this.getClass().getResourceAsStream("configurationTemplate.ini")){
                         try(BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream))){
@@ -257,6 +322,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                 }
             }
 
+            // TODO try to read data from previous java-app execution, or search inside internalArguments
 //            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
         });
 

@@ -244,6 +244,8 @@ public class InternalUtils implements SharedInternalTools {
                             return true;
                         }
                         // TODO put into log on verbose: different/unsupported architecture
+                        // TODO might want to check within COFF header for characteristics being exe, not DLL
+                        // TODO might want to check within "PE Optional Header" if subsystem is gui/cli
                     }
                 }
             }
