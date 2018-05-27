@@ -1,0 +1,11 @@
+import java.io.*;
+
+File bundlesFolder = new File( basedir, "target/distbundle" );
+if( !bundlesFolder.exists() ){
+    throw new Exception( "there should be a distbundle-folder!");
+}
+
+File javaAppFolder = new File( bundlesFolder, "java-app" );
+if( !javaAppFolder.exists() ){
+    throw new Exception( "there should be a java-app-folder!");
+}
