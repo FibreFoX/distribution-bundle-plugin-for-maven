@@ -240,10 +240,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private String signJarsLibFilter;
 
     /**
-     * To create some easy to share distribution bundle, the generated executable java application bundle is getting packed
+     * To create some easy to share distribution bundle, set this to "true" to get the generated executable java application bundle getting packed
      * into some ZIP-file inside the configured build-folder (normally inside the "target"-folder).
      */
-    @Parameter(defaultValue = "true")
+    @Parameter(defaultValue = "false")
     private boolean createPackedBundle;
 
     /**
