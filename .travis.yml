@@ -68,6 +68,7 @@ matrix:
       addons:
         apt:
           packages:
+            - openjfx
           ## RPM
             - rpm
           ## DEB
@@ -82,6 +83,7 @@ matrix:
       addons:
         apt:
           packages:
+            - openjfx
           ## RPM
             - rpm
           ## DEB
