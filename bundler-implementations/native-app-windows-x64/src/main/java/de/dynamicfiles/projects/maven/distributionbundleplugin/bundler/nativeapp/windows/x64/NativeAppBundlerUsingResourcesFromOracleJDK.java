@@ -30,7 +30,6 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,7 +53,7 @@ import org.apache.maven.repository.RepositorySystem;
  */
 public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBundler {
 
-    private final String jmodWithLauncherBinaries = "jdk.packager.jmod";
+    protected final String jmodWithLauncherBinaries = "jdk.packager.jmod";
 
     @Override
     public File bundleApp(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log logger) throws MojoFailureException, MojoExecutionException {
@@ -82,7 +81,8 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             }
 
             List<String> command = new ArrayList<>();
-            command.add("jmod");
+            // use the jmod-command from the provided JDK-path (might be a different version, where something has changed
+            command.add(new File(nativeAppOptions.getJdkPath()).getAbsolutePath() + File.separator + "jmod.exe");
             command.add("extract");
             command.add("--dir");
             command.add(nativeAppOptions.getTempWorkfolder().getAbsolutePath());
@@ -94,8 +94,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
             ProcessBuilder extractionProcess = new ProcessBuilder()
                     .inheritIO()
-                    // use the jmod-command from the provided JDK-path (might be a different version, where something has changed
-                    .directory(new File(nativeAppOptions.getJdkPath()))
+                    .directory(new File(project.getBuild().getDirectory()))
                     .command(command);
             try{
                 Process p = extractionProcess.start();
@@ -189,7 +188,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
                 throw new MojoExecutionException("Required JavaFX file was not found: ant-javafx.jar, please make sure to have some javafx installed");
             }
             System.out.println("Would work on JDK 8 file schema");
-            // TODO
+            // TODO implement working for JDK8
         }
 
         AtomicReference<MojoExecutionException> configurationCreationException = new AtomicReference<>();
