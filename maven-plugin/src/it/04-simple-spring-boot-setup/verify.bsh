@@ -9,3 +9,19 @@ File javaAppFolder = new File( bundlesFolder, "java-app" );
 if( !javaAppFolder.exists() ){
     throw new Exception( "there should be a java-app-folder!");
 }
+
+File javaAppJar = new File( javaAppFolder, "simple-spring-boot-setup-1.0.jar" );
+if( !javaAppJar.exists() ){
+    throw new Exception( "there should be a jar file!");
+}
+
+// only one jar should exist, no lib-folder or other files
+if( javaAppFolder.list().length > 1 ){
+    throw new Exception( "only one file is expected to be present!");
+}
+
+
+File executionPropertiesFile = new File( basedir, "target/distbundle.java-app-execution.generate-java-bundle.properties" );
+if( !executionPropertiesFile.exists() ){
+    throw new Exception( "there should be a properties file containing all data for that one goal execution!");
+}
