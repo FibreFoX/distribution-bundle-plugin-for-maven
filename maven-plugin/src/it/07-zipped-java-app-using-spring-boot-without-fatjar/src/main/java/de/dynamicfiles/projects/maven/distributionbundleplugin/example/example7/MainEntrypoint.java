@@ -1,4 +1,4 @@
-package de.dynamicfiles.projects.maven.distributionbundleplugin.example.zippedjavaappusingspringbootwithoutfatjar;
+package de.dynamicfiles.projects.maven.distributionbundleplugin.example.example7;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;

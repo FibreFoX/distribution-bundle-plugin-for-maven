@@ -77,7 +77,7 @@
                             <!-- <sourceClassifier>customsourceartifactclassifier</sourceClassifier> -->
 
                             <!-- as spring boot is not doing it's "main class" detection, we have to specify this here -->
-                            <mainClass>de.dynamicfiles.projects.maven.distributionbundleplugin.example.zippedjavaappusingspringbootwithoutfatjar.MainEntrypoint</mainClass>
+                            <mainClass>de.dynamicfiles.projects.maven.distributionbundleplugin.example.example7.MainEntrypoint</mainClass>
                         </configuration>
                     </execution>
                 </executions>
