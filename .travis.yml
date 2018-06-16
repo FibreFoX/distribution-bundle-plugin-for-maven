@@ -58,21 +58,22 @@ matrix:
             - rpm
           ## DEB
             - fakeroot
-    # use OpenJDK :) without OpenJFX
-    - os: linux
-      sudo: false
-      dist: trusty
-      jdk: openjdk10
-      install: true
-      env: FAILURES_ALLOWED=false
-      addons:
-        apt:
-          packages:
-            - openjfx
-          ## RPM
-            - rpm
-          ## DEB
-            - fakeroot
+# as TravisCI does NOT HAVE CURRENT LTS VERSIONS, do not try to install OpenJFX :( or even try anything...
+#    # use OpenJDK :) without OpenJFX
+#    - os: linux
+#      sudo: false
+#      dist: trusty
+#      jdk: openjdk10
+#      install: true
+#      env: FAILURES_ALLOWED=false
+#      addons:
+#        apt:
+#          packages:
+#            - openjfx
+#          ## RPM
+#            - rpm
+#          ## DEB
+#            - fakeroot
     # as this project is intended to be done for JDK10+, check newer version too
     - os: linux
       sudo: false
@@ -83,7 +84,8 @@ matrix:
       addons:
         apt:
           packages:
-            - openjfx
+# as TravisCI does NOT HAVE CURRENT LTS VERSIONS, do not try to install OpenJFX :(
+#            - openjfx
           ## RPM
             - rpm
           ## DEB
