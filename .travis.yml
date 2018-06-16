@@ -31,6 +31,61 @@ matrix:
             - rpm
           ## DEB
             - fakeroot
+    - os: linux
+      sudo: false
+      dist: trusty
+      jdk: oraclejdk10
+      install: true
+      env: FAILURES_ALLOWED=false
+      addons:
+        apt:
+          packages:
+          ## RPM
+            - rpm
+          ## DEB
+            - fakeroot
+    # as this project is intended to be done for JDK10+, check newer version too
+    - os: linux
+      sudo: false
+      dist: trusty
+      jdk: oraclejdk-ea
+      install: true
+      env: FAILURES_ALLOWED=false
+      addons:
+        apt:
+          packages:
+          ## RPM
+            - rpm
+          ## DEB
+            - fakeroot
+    # use OpenJDK :) without OpenJFX
+    - os: linux
+      sudo: false
+      dist: trusty
+      jdk: openjdk10
+      install: true
+      env: FAILURES_ALLOWED=false
+      addons:
+        apt:
+          packages:
+          ## RPM
+            - rpm
+          ## DEB
+            - fakeroot
+    # as this project is intended to be done for JDK10+, check newer version too
+    - os: linux
+      sudo: false
+      dist: trusty
+      jdk: openjdk11
+      install: true
+      env: FAILURES_ALLOWED=false
+      addons:
+        apt:
+          packages:
+          ## RPM
+            - rpm
+          ## DEB
+            - fakeroot
     ## has older Maven
     - os: linux
       sudo: false
