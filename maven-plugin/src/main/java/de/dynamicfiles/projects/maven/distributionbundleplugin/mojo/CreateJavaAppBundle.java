@@ -65,7 +65,7 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectHelper;
 
 /**
- * This MOJO creates an executable java application bundle which gets wrapped in some ZIP-file. As input-file the generated
+ * This MOJO creates an executable java application bundle which can get wrapped in some ZIP-file. As input-file the generated
  * project-artifact is used in order to process some work to make it executable.
  *
  * @author Danny Althoff
@@ -136,7 +136,9 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
     /**
      * By default system-scoped dependencies are not used for copying into the lib-folder. In case you have some special dependencies
-     * (like packager.jar for having user defined JVM arguments, using JDK 8), set this to "true".
+     * (like packager.jar for having user defined JVM arguments, using JDK 8), set this to "true". In case you have multiple dependencies
+     * that are system-scoped, but do not want to have all of them being bundled, set this to "false" and copy the wanted dependencies
+     * prior using this plugin, having "generateClasspathUsingLibFolder" set to "true".
      */
     @Parameter(defaultValue = "false")
     private boolean copySystemDependencies;
@@ -158,6 +160,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
      * When having dependencies, to create some executable jar-file the corresponding classpath inside the JAR's manifest has to
      * point to the required files inside the lib-folder. In case you already have some classpath inside that JAR-file, set this to "false".
      * This is the case if you use some spring-boot project, where the created JAR-file already has the dependencies inside.
+     * There is no way to have a fixed classpath, mostly because this can be done outside prior using this plugin, it's intended!
      */
     @Parameter(defaultValue = "true")
     private boolean generateClasspath;
@@ -649,7 +652,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     manifest.write(manifestOutput);
                 }
             } catch(IOException ex){
-                throw new MojoExecutionException(null, ex);
+                throw new MojoExecutionException("Could not process JAR file.", ex);
             }
         }
     }
@@ -683,6 +686,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     } catch(IOException ex){
                         copyException.set(new MojoExecutionException("Could not copy additional application resources, please check your build log.", ex));
                     }
+                } else {
+                    if( verbose ){
+                        getLog().info("Skipped due to prior exception.");
+                    }
                 }
             });
             if( copyException.get() != null ){
@@ -709,6 +716,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 project.getDependencies().stream()
                         .filter(dependency -> "system".equalsIgnoreCase(dependency.getScope()))
                         .forEach(dependency -> {
+                            if( verbose ){
+                                getLog().info("Copying dependency to lib folder...");
+                                getLog().info("Using source: " + dependency.getSystemPath());
+                            }
                             // when having the first exception, skip all following tasks
                             if( copyException.get() == null ){
                                 File dependencyFilePath = new File(dependency.getSystemPath());
@@ -718,6 +729,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                                     copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
                                 } catch(IOException ex){
                                     copyException.set(new MojoExecutionException("Could not copy system-scoped dependency, please check your build log.", ex));
+                                }
+                            } else {
+                                if( verbose ){
+                                    getLog().info("Skipped due to prior exception.");
                                 }
                             }
                         });
@@ -735,6 +750,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 File artifactFile = dependencyArtifact.getFile();
                 return artifactFile.isFile() && artifactFile.canRead();
             }).forEach(dependencyArtifact -> {
+                if( verbose ){
+                    getLog().info("Copying dependency to lib folder...");
+                    getLog().info("Using source: " + dependencyArtifact.getFile());
+                }
                 // when having the first exception, skip all following tasks
                 if( copyException.get() == null ){
                     File dependencyArtifactFile = dependencyArtifact.getFile();
@@ -744,6 +763,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
                         copiedDependencies.add(outputLibFolder.toPath().relativize(targetLibFile.toPath()).toString());
                     } catch(IOException ex){
                         copyException.set(new MojoExecutionException("Could not copy provided-scoped or runtime-scoped dependency, please check your build log.", ex));
+                    }
+                } else {
+                    if( verbose ){
+                        getLog().info("Skipped due to prior exception.");
                     }
                 }
             });

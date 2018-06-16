@@ -38,9 +38,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Some methods which are used internally.
+ * Some methods which are used internally. This class is shared to each bundler, making it easy to re-used already existing cool stuff.
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public class InternalUtils implements SharedInternalTools {
 
@@ -255,4 +255,6 @@ public class InternalUtils implements SharedInternalTools {
 
         return false;
     }
+    
+    // TODO find out how to check mac-executables being 64bit (do I even need this anyway?)
 }

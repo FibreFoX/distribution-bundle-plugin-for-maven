@@ -29,7 +29,7 @@
     <url>https://www.dynamicfiles.de</url>
     <description>
         Easy creationg of shareable software bundles for your Java application, integrated into your build-system: Maven.
-        Each bundler used by the distribution-bundle-plugin require to have some interface implemented. This projects provides that SPI.
+        Each bundler used by the distribution-bundle-plugin requires to have some interface implemented. This projects provides that SPI.
     </description>
     <inceptionYear>2018</inceptionYear>
 
