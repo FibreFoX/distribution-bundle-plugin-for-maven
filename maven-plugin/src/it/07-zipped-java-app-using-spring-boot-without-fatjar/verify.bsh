@@ -1,0 +1,34 @@
+import java.io.*;
+
+File bundlesFolder = new File( basedir, "target/distbundle" );
+if( !bundlesFolder.exists() ){
+    throw new Exception( "there should be a distbundle-folder!");
+}
+
+File javaAppFolder = new File( bundlesFolder, "java-app" );
+if( !javaAppFolder.exists() ){
+    throw new Exception( "there should be a java-app-folder!");
+}
+
+File javaAppJar = new File( javaAppFolder, "zipped-java-app-using-spring-boot-without-fatjar-1.0.jar" );
+if( !javaAppJar.exists() ){
+    throw new Exception( "there should be a jar file!");
+}
+
+// normally all libs should reside inside the jar-file (because of spring boot),
+// but as we opted out to use that executable-spring-jar-file, we have a lot of dependencies inside
+// our lib-folder, makes it possible to not have to worry about compression of libs in BOOT-INF
+if( javaAppFolder.list().length > 2 ){
+    throw new Exception( "one jar-file and one folder is expected to be present!");
+}
+
+File executionPropertiesFile = new File( basedir, "target/distbundle.java-app-execution.generate-java-bundle.properties" );
+if( !executionPropertiesFile.exists() ){
+    throw new Exception( "there should be a properties file containing all data for that one goal execution!");
+}
+
+// make sure the ZIP-file got created too
+File zippedAppFile = new File( basedir, "target/zipped-java-app-using-spring-boot-without-fatjar-1.0-java-app-bundle.zip" );
+if( !zippedAppFile.exists() ){
+    throw new Exception( "the application should get zipped up!");
+}
