@@ -20,3 +20,38 @@ There are three types of bundles:
 1. (java-app bundle) executable jar-file with dependencies
 2. (native-app bundle) executable jar-file with dependencies, with the addition of some OS native launcher files and some JRE aside
 3. (native-installer bundle) all the above, packed and stuffed into some native installer file (MSI, DEB, PKG, ...) without a lot of restrictions
+
+# Available as SNAPSHOT-version
+
+To be one of the first beta-testers, just add the first available snapshot-version using the snapshot-repository from Sonatype:
+
+```xml
+<pluginRepositories>
+    <pluginRepository>
+        <id>oss-sonatype-snapshots</id>
+        <url>https://oss.sonatype.org/content/groups/public/</url>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </pluginRepository>
+</pluginRepositories>
+```
+
+Add this to your `<build>`-block:
+
+```xml
+<plugin>
+    <groupId>de.dynamicfiles.projects.maven</groupId>
+    <artifactId>distribution-bundle-plugin</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <executions>
+        <execution>
+            <id>generate-java-bundle</id>
+            <phase>package</phase>
+            <goals>
+                <goal>java-app</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
