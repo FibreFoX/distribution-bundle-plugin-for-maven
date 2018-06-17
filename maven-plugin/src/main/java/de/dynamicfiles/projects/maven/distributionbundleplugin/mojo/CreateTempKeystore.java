@@ -38,7 +38,7 @@ import org.apache.maven.project.MavenProject;
  *
  * @author Danny Althoff
  */
-@Mojo(name = "temp-keystore", requiresDependencyResolution = ResolutionScope.NONE)
+@Mojo(name = "create-temp-keystore", requiresDependencyResolution = ResolutionScope.NONE)
 public class CreateTempKeystore extends AbstractMojo {
 
     @Parameter(defaultValue = "${project}", readonly = true)
@@ -47,7 +47,7 @@ public class CreateTempKeystore extends AbstractMojo {
     /**
      * Enable to see some status messages.
      */
-    @Parameter(defaultValue = "false")
+    @Parameter(defaultValue = "true")
     private boolean verbose;
 
     /**
@@ -59,7 +59,7 @@ public class CreateTempKeystore extends AbstractMojo {
     /**
      * Specify the target location of the generated keystore.
      */
-    @Parameter(defaultValue = "${project.basedir}/src/main/distbundle/java-app/keystore.jks")
+    @Parameter(defaultValue = "${project.basedir}/src/main/distbundle/java-app/keystore.pkcs12")
     private File keystore;
 
     /**
@@ -78,6 +78,8 @@ public class CreateTempKeystore extends AbstractMojo {
      * <code>
      * &lt;createParameters&gt;
      *     &lt;parameter&gt;-genkeypair&lt;/parameter&gt;
+     *     &lt;parameter&gt;-storetype&lt;/parameter&gt;
+     *     &lt;parameter&gt;pkcs12&lt;/parameter&gt;
      *     &lt;parameter&gt;-keystore&lt;/parameter&gt;
      *     &lt;parameter&gt;{KEYSTORE}&lt;/parameter&gt;
      *     &lt;parameter&gt;-alias&lt;/parameter&gt;
@@ -122,6 +124,13 @@ public class CreateTempKeystore extends AbstractMojo {
             throw new MojoFailureException("Missing configuration of 'createParameters'-parameter. Please check your plugin-configuration.");
         }
 
+        // prepare target area
+        try{
+            Files.createDirectories(keystore.toPath().getParent());
+        } catch(IOException ex){
+            throw new MojoFailureException("Could not create folder for keystore at: " + keystore.getAbsolutePath(), ex);
+        }
+
         // find keytool
         Path jdkLocationPath = new File(jdkPath).toPath();
         // speculation: in case of older JDKs, the "java.home" property is the JRE inside the JDK, so if we can detect the "java"-binary inside
@@ -162,9 +171,9 @@ public class CreateTempKeystore extends AbstractMojo {
 
         createCommand.addAll(createParameters);
 
-        // replace {KEYTOOL}-template with real filename
+        // replace {KEYSTORE}-template with real filename
         List<String> createCommandToUse = createCommand.stream().map(creatingParameter -> {
-            if( "{KEYTOOL}".equalsIgnoreCase(creatingParameter) ){
+            if( "{KEYSTORE}".equalsIgnoreCase(creatingParameter) ){
                 return keystore.getAbsolutePath();
             }
             return creatingParameter;
