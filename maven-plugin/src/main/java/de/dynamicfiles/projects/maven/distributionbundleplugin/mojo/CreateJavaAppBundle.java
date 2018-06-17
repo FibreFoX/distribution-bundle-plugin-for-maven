@@ -85,7 +85,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
     /**
      * Enable to see some status messages.
      */
-    @Parameter(defaultValue = "false")
+    @Parameter(defaultValue = "true")
     private boolean verbose;
 
     /**
@@ -216,8 +216,10 @@ public class CreateJavaAppBundle extends AbstractMojo {
      * <code>
      * &lt;signParameters&gt;
      *     &lt;parameter&gt;-strict&lt;/parameter&gt;
+     *     &lt;parameter&gt;-storetype&lt;/parameter&gt;
+     *     &lt;parameter&gt;pkcs12&lt;/parameter&gt;
      *     &lt;parameter&gt;-keystore&lt;/parameter&gt;
-     *     &lt;parameter&gt;${project.basedir}/src/main/distbundle/yourKeystore.jks&lt;/parameter&gt;
+     *     &lt;parameter&gt;${project.basedir}/src/main/distbundle/yourKeystore.pkcs12&lt;/parameter&gt;
      *     &lt;parameter&gt;-storepass&lt;/parameter&gt;
      *     &lt;parameter&gt;changeit&lt;/parameter&gt;
      *     &lt;parameter&gt;-keypass&lt;/parameter&gt;
