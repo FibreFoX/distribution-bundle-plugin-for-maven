@@ -1,0 +1,26 @@
+import java.io.*;
+
+File bundlesFolder = new File( basedir, "target/distbundle" );
+if( !bundlesFolder.exists() ){
+    throw new Exception( "there should be a distbundle-folder!");
+}
+
+File javaAppFolder = new File( bundlesFolder, "java-app" );
+if( !javaAppFolder.exists() ){
+    throw new Exception( "there should be a java-app-folder!");
+}
+
+File javaAppJar = new File( javaAppFolder, "additional-java-app-resources-1.0.jar" );
+if( !javaAppJar.exists() ){
+    throw new Exception( "there should be a jar file!");
+}
+File additionalResourceFile = new File( javaAppFolder, "README.md" );
+if( !additionalResourceFile.exists() ){
+    throw new Exception( "there should be a README.md file!");
+}
+
+
+File executionPropertiesFile = new File( basedir, "target/distbundle.java-app-execution.generate-java-bundle.properties" );
+if( !executionPropertiesFile.exists() ){
+    throw new Exception( "there should be a properties file containing all data for that one goal execution!");
+}

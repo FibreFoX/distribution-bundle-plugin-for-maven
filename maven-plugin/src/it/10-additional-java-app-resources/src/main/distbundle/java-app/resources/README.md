@@ -1,0 +1,1 @@
+some kind of useful stuff, just here for showing how <additionalAppResources> works
