@@ -3,12 +3,12 @@
 
 # WORK IN PROGRESS
 
-* This is intended to replace the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), as this is a rewrite of the whole contept, without the requirement for the OpenJFX/JavaFX-part being installed.
-* **Issue-section will be opened once this plugin is released**
+* This will replace the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), as this is a rewrite of the whole contept, without the requirement for the OpenJFX/JavaFX-part being installed. It'll be JavaFX-agnostic, making it more accessable to non-JFX applications.
 * **pull-requests are getting ignored and closed unseed until this plugin is released**
-* unlike the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), this maven-plugin does not rely on the installed JavaFX/OpenJFX parts, but it re-uses the files that are coming with, so make sure to have them installed aswell (the roadmap contains a rewrite of the native launcher part)
-* no batteries included: every bundle-type except "java-app" is done in a separate project, making this maven-plugin like a nice bootstrapper for custom bundlers
+* unlike the [javafx-maven-plugin](https://github.com/javafx-maven-plugin/javafx-maven-plugin), this maven-plugin does try to not rely on the installed JavaFX/OpenJFX parts, but on short term (to make the replacement-process faster) it re-uses the files that are coming with them, so make sure to have them installed aswell (the roadmap contains a rewrite of the native launcher part, probably using RUST)
+* no batteries included: every bundle-type except "java-app" is done in a separate maven-project, making this maven-plugin like a nice bootstrapper for custom bundlers, and making it more flexible for having your very own way to bundle your stuff (like DromblerFX)
 * please look in the [test-projects](maven-plugin/src/it/) to have some insight whats coming up
+* I am aware of the proposal/JEP [JDK-8200758](https://bugs.openjdk.java.net/browse/JDK-8200758) regarding oracles own replacement for the javapackager, but as they did not a good job on that, and to avoid any deep dependency on that, I do not intend to re-integrate with their stuff (time will have to tell about the quality of their tool, might change my mind about it)
 
 # Easy creationg of shareable software bundles for your Java application
 
