@@ -1,0 +1,6 @@
+import java.io.*;
+
+File keystoreFile = new File( basedir, "src/main/distbundle/java-app/keystore.pkcs12" );
+if( !keystoreFile.exists() ){
+    throw new Exception( "there should be a keystore-file!");
+}
