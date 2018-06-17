@@ -147,7 +147,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
      * When you need to add additional files to generated app-folder (e.g. README, license, third-party-tools, ...),
      * you can specify the source-folder here. All files will be copied recursively.
      */
-    @Parameter(defaultValue = "${project.basedir}/src/main/distbundle/java-app-resources")
+    @Parameter(defaultValue = "${project.basedir}/src/main/distbundle/java-app/resources")
     private File additionalAppResources;
 
     /**
@@ -201,7 +201,7 @@ public class CreateJavaAppBundle extends AbstractMojo {
     private boolean signJars;
 
     /**
-     * In case your have a special JDK to be used for signing, please specify this here. Expects some extracted/installed JDK.
+     * In case you have a special JDK to be used for signing, please specify this here. Expects some extracted/installed JDK.
      */
     @Parameter(defaultValue = "${java.home}")
     private String jdkPath;
@@ -222,6 +222,24 @@ public class CreateJavaAppBundle extends AbstractMojo {
      *     &lt;parameter&gt;changeit&lt;/parameter&gt;
      *     &lt;parameter&gt;-keypass&lt;/parameter&gt;
      *     &lt;parameter&gt;changeit&lt;/parameter&gt;
+     *     &lt;parameter&gt;{JAR}&lt;/parameter&gt;
+     *     &lt;parameter&gt;alias&lt;/parameter&gt;
+     * &lt;/signParameters&gt;
+     * </code>
+     *
+     * Having the opportunity to using some hardware token, you can make use of it, by customizing the command parameters:
+     * <code>
+     * &lt;signParameters&gt;
+     *     &lt;parameter&gt;-keystore&lt;/parameter&gt;
+     *     &lt;parameter&gt;NONE&lt;/parameter&gt;
+     *     &lt;parameter&gt;-storetype&lt;/parameter&gt;
+     *     &lt;parameter&gt;PKCS11&lt;/parameter&gt;
+     *     &lt;parameter&gt;-tsa&lt;/parameter&gt;
+     *     &lt;parameter&gt;http://timestamp.globalsign.com/scripts/timestamp.dll&lt;/parameter&gt;
+     *     &lt;parameter&gt;-providerClass&lt;/parameter&gt;
+     *     &lt;parameter&gt;sun.security.pkcs11.SunPKCS11&lt;/parameter&gt;
+     *     &lt;parameter&gt;-providerArg&lt;/parameter&gt;
+     *     &lt;parameter&gt;${project.basedir}/src/main/distbundle/java-app/eToken.config&lt;/parameter&gt;
      *     &lt;parameter&gt;{JAR}&lt;/parameter&gt;
      *     &lt;parameter&gt;alias&lt;/parameter&gt;
      * &lt;/signParameters&gt;
@@ -518,13 +536,16 @@ public class CreateJavaAppBundle extends AbstractMojo {
 
                 // being verbose makes jarsigner verbose too ;)
                 if( verbose ){
-                    signingCommand.add("-verbose");
+                    boolean alreadyContainsVerboseFlag = signParameters.stream().filter(parameter -> parameter.trim().equalsIgnoreCase("-verbose")).count() > 0;
+                    if( !alreadyContainsVerboseFlag ) {
+                        signingCommand.add("-verbose");
+                    }
                 }
                 // parameters
                 signingCommand.addAll(signParameters);
 
                 // replace {JAR}-template with real filename
-                signingCommand.stream().map(signingParameter -> {
+                List<String> signingCommandToUse = signingCommand.stream().map(signingParameter -> {
                     if( "{JAR}".equalsIgnoreCase(signingParameter) ){
                         return filepathToSign;
                     }
@@ -536,9 +557,9 @@ public class CreateJavaAppBundle extends AbstractMojo {
                     ProcessBuilder pb = new ProcessBuilder()
                             .inheritIO()
                             .directory(project.getBasedir())
-                            .command(new ArrayList<>(signingCommand));
+                            .command(signingCommandToUse);
                     if( verbose ){
-                        getLog().info("Running command: " + String.join(" ", signingCommand));
+                        getLog().info("Running command: " + String.join(" ", signingCommandToUse));
                     }
                     Process p = pb.start();
                     p.waitFor();
