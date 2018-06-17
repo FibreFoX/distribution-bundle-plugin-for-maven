@@ -17,7 +17,7 @@ package de.dynamicfiles.projects.maven.distributionbundleplugin.api;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public enum OS {
     WINDOWS, LINUX, MAC

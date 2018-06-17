@@ -29,7 +29,7 @@ import org.apache.maven.repository.RepositorySystem;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public interface NativeAppBundler {
 

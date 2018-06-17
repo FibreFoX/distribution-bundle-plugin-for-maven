@@ -17,7 +17,7 @@ package de.dynamicfiles.projects.maven.distributionbundleplugin.bundler.nativeap
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public enum InternalParameterEnum {
 

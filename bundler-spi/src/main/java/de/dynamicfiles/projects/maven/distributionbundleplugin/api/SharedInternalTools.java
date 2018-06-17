@@ -21,7 +21,7 @@ import java.nio.file.Path;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public interface SharedInternalTools {
 

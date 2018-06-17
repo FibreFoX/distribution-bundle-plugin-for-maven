@@ -19,7 +19,7 @@ import java.io.File;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public class NativeLauncher {
 

@@ -20,7 +20,7 @@ import java.io.File;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public interface NativeInstallerBundle {
 

@@ -49,7 +49,7 @@ import org.apache.maven.repository.RepositorySystem;
 
 /**
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBundler {
 
