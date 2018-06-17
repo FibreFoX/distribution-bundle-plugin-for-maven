@@ -1,0 +1,27 @@
+import java.io.*;
+
+File bundlesFolder = new File( basedir, "target/distbundle" );
+if( !bundlesFolder.exists() ){
+    throw new Exception( "there should be a distbundle-folder!");
+}
+
+File javaAppFolder = new File( bundlesFolder, "java-app" );
+if( !javaAppFolder.exists() ){
+    throw new Exception( "there should be a java-app-folder!");
+}
+
+File javaAppJar = new File( javaAppFolder, "zip-and-attach-as-project-artifact-with-target-classifier-1.0.jar" );
+if( !javaAppJar.exists() ){
+    throw new Exception( "there should be a jar file!");
+}
+
+File executionPropertiesFile = new File( basedir, "target/distbundle.java-app-execution.generate-java-bundle.properties" );
+if( !executionPropertiesFile.exists() ){
+    throw new Exception( "there should be a properties file containing all data for that one goal execution!");
+}
+
+// now check if attached artifact got installed into the repository
+File attachedArtifact = new File( basedir, "../../local-repo/de/dynamicfiles/projects/maven/distributionbundleplugin/examples/zip-and-attach-as-project-artifact-with-target-classifier/1.0/zip-and-attach-as-project-artifact-with-target-classifier-1.0-app.zip" );
+if( !attachedArtifact.exists() ){
+    throw new Exception( "ZIP artifact should have been installed!");
+}
