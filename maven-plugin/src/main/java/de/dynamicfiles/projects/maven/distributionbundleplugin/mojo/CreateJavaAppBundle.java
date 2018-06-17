@@ -506,24 +506,32 @@ public class CreateJavaAppBundle extends AbstractMojo {
             Set<String> filepathsToSign = new LinkedHashSet<>();
             // add generated artifact file
             filepathsToSign.add(targetAppArtifact.toAbsolutePath().toString());
-            // add all jars in lib-folder
-            FileSystem libFolderFilesystem = outputLibFolder.toPath().getFileSystem();
-            PathMatcher pathMatcher = libFolderFilesystem.getPathMatcher("glob:" + signJarsLibFilter);
 
-            try{
-                Files.walkFileTree(outputLibFolder.toPath(), new SimpleFileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        Path relativeFileOfLib = outputLibFolder.toPath().relativize(file);
-                        if( pathMatcher.matches(relativeFileOfLib) ){
-                            // add to signing-list
-                            filepathsToSign.add(file.toAbsolutePath().toString());
+            // check if lib-folder if existing
+            if( outputLibFolder.exists() ){
+                // add all jars in lib-folder
+                FileSystem libFolderFilesystem = outputLibFolder.toPath().getFileSystem();
+                PathMatcher pathMatcher = libFolderFilesystem.getPathMatcher("glob:" + signJarsLibFilter);
+
+                try{
+                    Files.walkFileTree(outputLibFolder.toPath(), new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                            Path relativeFileOfLib = outputLibFolder.toPath().relativize(file);
+                            if( pathMatcher.matches(relativeFileOfLib) ){
+                                // add to signing-list
+                                filepathsToSign.add(file.toAbsolutePath().toString());
+                            }
+                            return FileVisitResult.CONTINUE;
                         }
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            } catch(IOException ioex){
-                throw new MojoExecutionException(null, ioex);
+                    });
+                } catch(IOException ioex){
+                    throw new MojoExecutionException("Could not search for files in lib-folder.", ioex);
+                }
+            }
+
+            if( verbose ){
+                getLog().info(String.format("Found %s files to sign.", filepathsToSign.size()));
             }
 
             // do signing stuff
@@ -532,14 +540,14 @@ public class CreateJavaAppBundle extends AbstractMojo {
                 if( signingException.get() != null ){
                     return;
                 }
-                Set<String> signingCommand = new LinkedHashSet<>();
+                List<String> signingCommand = new ArrayList<>();
                 // command
                 signingCommand.add(pathToJarsigner.get());
 
                 // being verbose makes jarsigner verbose too ;)
                 if( verbose ){
                     boolean alreadyContainsVerboseFlag = signParameters.stream().filter(parameter -> parameter.trim().equalsIgnoreCase("-verbose")).count() > 0;
-                    if( !alreadyContainsVerboseFlag ) {
+                    if( !alreadyContainsVerboseFlag ){
                         signingCommand.add("-verbose");
                     }
                 }
