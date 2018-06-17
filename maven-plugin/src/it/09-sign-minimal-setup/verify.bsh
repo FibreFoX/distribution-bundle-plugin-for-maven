@@ -1,0 +1,26 @@
+import java.io.*;
+
+File keystoreFile = new File( basedir, "src/main/distbundle/java-app/keystore.pkcs12" );
+if( !keystoreFile.exists() ){
+    throw new Exception( "there should be a keystore-file!");
+}
+
+File bundlesFolder = new File( basedir, "target/distbundle" );
+if( !bundlesFolder.exists() ){
+    throw new Exception( "there should be a distbundle-folder!");
+}
+
+File javaAppFolder = new File( bundlesFolder, "java-app" );
+if( !javaAppFolder.exists() ){
+    throw new Exception( "there should be a java-app-folder!");
+}
+
+File javaAppJar = new File( javaAppFolder, "sign-minimal-setup-1.0.jar" );
+if( !javaAppJar.exists() ){
+    throw new Exception( "there should be a jar file!");
+}
+
+File executionPropertiesFile = new File( basedir, "target/distbundle.java-app-execution.generate-java-bundle.properties" );
+if( !executionPropertiesFile.exists() ){
+    throw new Exception( "there should be a properties file containing all data for that one goal execution!");
+}
