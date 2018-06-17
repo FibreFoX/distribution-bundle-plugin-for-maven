@@ -92,7 +92,9 @@
                         <configuration>
                             <signJars>true</signJars>
                             <signParameters>
-                                <parameter>-strict</parameter>
+                                <!-- self-signed certs are considered as WARNING (signerSelfSigned) since jdk9 -->
+                                <!-- so we are not using "strict"-mode for IT-projects -->
+                                <!-- <parameter>-strict</parameter> -->
                                 <parameter>-storetype</parameter>
                                 <parameter>pkcs12</parameter>
                                 <parameter>-keystore</parameter>
