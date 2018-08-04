@@ -53,8 +53,12 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.repository.RepositorySystem;
 
 /**
+ * This MOJO creates an native executable java application bundle which can get wrapped in some ZIP-file. As input-file the previous generated
+ * java-app bundle is used in order to it distributable using native launchers.
+ * 
+ * As a short term goal this re-uses the files provided by JDK8-10/OpenJFX.
  *
- * @author FibreFoX
+ * @author Danny Althoff
  */
 @Mojo(name = "native-app")
 public class CreateNativeAppBundle extends AbstractMojo {
@@ -91,7 +95,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
      * Some tasks require a special space to extract or manipulate files. To change the location,
      * just set this parameter to your wanted location.
      */
-    @Parameter(defaultValue = "${project.build.directory}/tmp/distbundle", property = "distbundle.nativeapp.tempWorkfolder")
+    @Parameter(defaultValue = "${project.build.directory}/distbundle-tmp", property = "distbundle.nativeapp.tempWorkfolder")
     private File tempWorkfolder;
 
     @Parameter(defaultValue = "false", property = "distbundle.nativeapp.cleanupOutputFolder")
