@@ -98,6 +98,11 @@ public class CreateNativeAppBundle extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}/distbundle-tmp", property = "distbundle.nativeapp.tempWorkfolder")
     private File tempWorkfolder;
 
+    /**
+     * When creating a native bundle, it sometimes is needed to clean the output-folder first. To speedup the process, the output-folder
+     * will not be cleaned, but it might result in files being present after it got deleted from the source-folder. Set this to true to
+     * recursivly delete the output-folder on each execution.
+     */
     @Parameter(defaultValue = "false", property = "distbundle.nativeapp.cleanupOutputFolder")
     private boolean cleanupOutputFolder;
 
