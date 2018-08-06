@@ -219,7 +219,7 @@ public class CreateNativeAppBundle extends AbstractMojo {
             throw new MojoFailureException("Not possible to create temporary working folder: " + tempWorkfolder.getAbsolutePath());
         }
 
-        if( !withJRE ){
+        if( withJRE ){
             if( jrePath == null || jrePath.trim().isEmpty() ){
                 if( verbose ){
                     getLog().info("JRE was not set, trying to autodetect...");
@@ -243,8 +243,9 @@ public class CreateNativeAppBundle extends AbstractMojo {
                 }
             }
             File jre = new File(jrePath);
+            jrePath = jre.toPath().normalize().toAbsolutePath().toFile().getAbsolutePath();
             if( !jre.exists() ){
-                throw new MojoFailureException("Could not find JRE at location: " + jre.getAbsolutePath());
+                throw new MojoFailureException("Could not find JRE at location: " + jrePath);
             }
         }
 
