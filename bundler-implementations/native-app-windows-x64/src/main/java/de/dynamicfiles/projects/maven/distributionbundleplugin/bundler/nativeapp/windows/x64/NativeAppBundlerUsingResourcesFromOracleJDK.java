@@ -82,7 +82,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
             List<String> command = new ArrayList<>();
             // use the jmod-command from the provided JDK-path (might be a different version, where something has changed
-            command.add(new File(nativeAppOptions.getJdkPath()).getAbsolutePath() + File.separator + "jmod.exe");
+            command.add(new File(nativeAppOptions.getJdkPath()).getAbsolutePath() + File.separator + "bin" + File.separator + "jmod.exe");
             command.add("extract");
             command.add("--dir");
             command.add(nativeAppOptions.getTempWorkfolder().getAbsolutePath());
@@ -322,7 +322,7 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
             }
 
             // TODO try to read data from previous java-app execution, or search inside internalArguments
-//            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
+            System.out.println("Working with TEMPLATE:\n" + configurationContent.get());
         });
 
         // copy JRE/runtime
@@ -345,11 +345,13 @@ public class NativeAppBundlerUsingResourcesFromOracleJDK implements NativeAppBun
 
     @Override
     public boolean checkRequirements(NativeAppOptions nativeAppOptions, SharedInternalTools internalUtils, MavenProject project, RepositorySystem repositorySystem, MojoExecution mojoExecution, MavenSession session, Log logger) {
-        Path javaBinary = new File(nativeAppOptions.getJrePath()).toPath().resolve("bin").resolve("java.exe");
-        boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(javaBinary);
-        if( !bitCheckOfLauncherMatching ){
-            logger.error("Provided JRE does not match expected bit architecture. Detected 32bit JRE instead of 64bit.");
-            return false;
+        if(nativeAppOptions.isWithJRE()){
+            Path javaBinary = new File(nativeAppOptions.getJrePath()).toPath().resolve("bin").resolve("java.exe");
+            boolean bitCheckOfLauncherMatching = internalUtils.isWindowsExecutable64bit(javaBinary);
+            if( !bitCheckOfLauncherMatching ){
+                logger.error("Provided JRE does not match expected bit architecture. Detected 32bit JRE instead of 64bit.");
+                return false;
+            }
         }
         return true;
     }
